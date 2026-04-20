@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
   LayoutDashboard,
@@ -10,12 +10,14 @@ import {
   FileText,
   Menu,
   X,
-  ShoppingBag,
   Settings,
+  LogOut,
 } from "lucide-react";
 import { useState } from "react";
 import "@/app/globals.css";
 import { Expletus_Sans } from "next/font/google";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { getProfileForRole } from "@/lib/utils/auth";
 
 const expletus = Expletus_Sans({
   subsets: ["latin"],
@@ -38,18 +40,24 @@ const providerNavItems = [
 
 const customerNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Services finden", href: "/find-services", icon: Search },
-  { label: "Meine Aufträge", href: "/my-orders", icon: ShoppingBag },
   { label: "Rechnungen", href: "/invoices", icon: FileText },
-  { label: "Einstellungen", href: "/profile", icon: Settings },
+  { label: "Einstellungen", href: "/customer-profile", icon: Settings },
 ];
 
 export default function Navbar({ userRole = "provider", userName = "E" }: NavbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const navItems = userRole === "customer" ? customerNavItems : providerNavItems;
   const avatarLetter = userName.charAt(0).toUpperCase();
+  const profileHref = getProfileForRole(userRole);
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/login");
+  };
 
   return (
     <header
@@ -57,15 +65,12 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
       style={{ borderBottom: "1px solid var(--secondary)" }}
     >
       <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-6 md:px-10">
-
         <Link
           href="/dashboard"
           className="text-[22px] font-bold tracking-tight"
           style={{ color: "var(--primary)" }}
         >
-          <span className={`${expletus.className} text-3xl tracking-wide`}>
-            LiNQ.
-          </span>
+          <span className={`${expletus.className} text-3xl tracking-wide`}>LiNQ.</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
@@ -124,9 +129,19 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
             />
           </button>
 
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-150"
+            style={{ color: "var(--text)", opacity: 0.55 }}
+            aria-label="Logout"
+          >
+            <LogOut size={17} strokeWidth={1.9} />
+          </button>
+
           <Link
-            href="/profile"
-            className="hidden md:flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-semibold ml-2 transition-all duration-150"
+            href={profileHref}
+            className="hidden md:flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-semibold ml-1 transition-all duration-150"
             style={{
               background: "color-mix(in srgb, var(--primary) 12%, transparent)",
               color: "var(--primary)",
@@ -175,7 +190,7 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
           })}
 
           <Link
-            href="/profile"
+            href={profileHref}
             onClick={() => setMenuOpen(false)}
             className="flex items-center gap-3 px-3 py-3 mt-2"
             style={{ borderTop: "1px solid var(--secondary)" }}
@@ -193,6 +208,16 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
               {userName}
             </span>
           </Link>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] font-medium text-text/70"
+            style={{ borderTop: "1px solid var(--secondary)" }}
+          >
+            <LogOut size={16} strokeWidth={1.9} />
+            Logout
+          </button>
         </div>
       )}
     </header>
