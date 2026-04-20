@@ -1,4 +1,5 @@
-import Navbar from "@/components/layout/Navbar";
+import { AuthProvider } from "@/components/auth/AuthProvider"
+import AppShell from "@/components/layout/AppShell"
 
 export default function RootLayout({
   children,
@@ -8,8 +9,9 @@ export default function RootLayout({
   return (
     <html lang="de">
       <body>
-        <Navbar userRole="provider" userName="E" />
-        {children}
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );
