@@ -1,23 +1,36 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Profile } from "@/lib/types/profile"
 
 interface ProfileSettingsFormProps {
   initialProfile: Profile
+  onSave: (nextProfile: Profile) => Promise<void>
+  loading?: boolean
+  saving?: boolean
 }
 
-export default function ProfileSettingsForm({ initialProfile }: ProfileSettingsFormProps) {
+export default function ProfileSettingsForm({
+  initialProfile,
+  onSave,
+  loading = false,
+  saving = false,
+}: ProfileSettingsFormProps) {
   const [profile, setProfile] = useState<Profile>(initialProfile)
   const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    setProfile(initialProfile)
+  }, [initialProfile])
 
   const handleChange = (field: keyof Profile, value: string | boolean) => {
     setSaved(false)
     setProfile((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleSave = (event: React.FormEvent) => {
+  const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
+    await onSave(profile)
     setSaved(true)
   }
 
@@ -32,7 +45,8 @@ export default function ProfileSettingsForm({ initialProfile }: ProfileSettingsF
             <input
               value={profile.firstName}
               onChange={(e) => handleChange("firstName", e.target.value)}
-              className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] text-text outline-none transition focus:border-primary/40"
+              disabled={loading || saving}
+              className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] text-text outline-none transition focus:border-primary/40 disabled:opacity-60"
             />
           </label>
 
@@ -41,7 +55,8 @@ export default function ProfileSettingsForm({ initialProfile }: ProfileSettingsF
             <input
               value={profile.lastName}
               onChange={(e) => handleChange("lastName", e.target.value)}
-              className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] text-text outline-none transition focus:border-primary/40"
+              disabled={loading || saving}
+              className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] text-text outline-none transition focus:border-primary/40 disabled:opacity-60"
             />
           </label>
 
@@ -51,7 +66,8 @@ export default function ProfileSettingsForm({ initialProfile }: ProfileSettingsF
               type="email"
               value={profile.email}
               onChange={(e) => handleChange("email", e.target.value)}
-              className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] text-text outline-none transition focus:border-primary/40"
+              disabled={loading || saving}
+              className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] text-text outline-none transition focus:border-primary/40 disabled:opacity-60"
             />
           </label>
 
@@ -60,7 +76,8 @@ export default function ProfileSettingsForm({ initialProfile }: ProfileSettingsF
             <input
               value={profile.phone}
               onChange={(e) => handleChange("phone", e.target.value)}
-              className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] text-text outline-none transition focus:border-primary/40"
+              disabled={loading || saving}
+              className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] text-text outline-none transition focus:border-primary/40 disabled:opacity-60"
             />
           </label>
         </div>
@@ -70,7 +87,8 @@ export default function ProfileSettingsForm({ initialProfile }: ProfileSettingsF
           <input
             value={profile.company}
             onChange={(e) => handleChange("company", e.target.value)}
-            className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] text-text outline-none transition focus:border-primary/40"
+            disabled={loading || saving}
+            className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] text-text outline-none transition focus:border-primary/40 disabled:opacity-60"
           />
         </label>
 
@@ -79,6 +97,7 @@ export default function ProfileSettingsForm({ initialProfile }: ProfileSettingsF
             type="checkbox"
             checked={profile.notificationsEnabled}
             onChange={(e) => handleChange("notificationsEnabled", e.target.checked)}
+            disabled={loading || saving}
             className="h-4 w-4 accent-primary"
           />
           Benachrichtigungen aktivieren
@@ -87,12 +106,13 @@ export default function ProfileSettingsForm({ initialProfile }: ProfileSettingsF
         <div className="flex items-center gap-3">
           <button
             type="submit"
-            className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
+            disabled={loading || saving}
+            className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
           >
-            Änderungen speichern
+            {saving ? "Speichern…" : "Änderungen speichern"}
           </button>
 
-          {saved && (
+          {saved && !saving && (
             <p className="text-sm text-primary">Gespeichert.</p>
           )}
         </div>
