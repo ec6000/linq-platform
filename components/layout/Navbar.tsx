@@ -1,11 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Bell, LayoutDashboard, Search, Wrench, FileText, Menu, X, ShoppingBag } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  Bell,
+  LayoutDashboard,
+  Search,
+  Wrench,
+  FileText,
+  Menu,
+  X,
+  Settings,
+  LogOut,
+} from "lucide-react";
 import { useState } from "react";
 import "@/app/globals.css";
 import { Expletus_Sans } from "next/font/google";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { getProfileForRole } from "@/lib/utils/auth";
 
 const expletus = Expletus_Sans({
   subsets: ["latin"],
@@ -23,26 +35,29 @@ const providerNavItems = [
   { label: "Aufträge finden", href: "/find-jobs", icon: Search },
   { label: "Meine Services", href: "/my-services", icon: Wrench },
   { label: "Rechnungen", href: "/invoices", icon: FileText },
+  { label: "Einstellungen", href: "/profile", icon: Settings },
 ];
 
 const customerNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Services finden", href: "/find-services", icon: Search },
-  { label: "Meine Aufträge", href: "/my-orders", icon: ShoppingBag },
   { label: "Rechnungen", href: "/invoices", icon: FileText },
+  { label: "Einstellungen", href: "/customer-profile", icon: Settings },
 ];
-
-interface NavbarProps {
-  userRole?: "provider" | "customer";
-  userName?: string;
-}
 
 export default function Navbar({ userRole = "provider", userName = "E" }: NavbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const navItems = userRole === "customer" ? customerNavItems : providerNavItems;
   const avatarLetter = userName.charAt(0).toUpperCase();
+  const profileHref = getProfileForRole(userRole);
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/login");
+  };
 
   return (
     <header
@@ -50,19 +65,14 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
       style={{ borderBottom: "1px solid var(--secondary)" }}
     >
       <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-6 md:px-10">
-
-        {/* Logo */}
         <Link
           href="/dashboard"
           className="text-[22px] font-bold tracking-tight"
           style={{ color: "var(--primary)" }}
         >
-          <span className={`${expletus.className} text-3xl tracking-wide`}>
-            LiNQ.
-          </span>
+          <span className={`${expletus.className} text-3xl tracking-wide`}>LiNQ.</span>
         </Link>
 
-        {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -97,9 +107,7 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
           })}
         </nav>
 
-        {/* Rechts: Bell + Avatar + Burger */}
         <div className="flex items-center gap-1">
-          {/* Bell */}
           <button
             type="button"
             className="relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-150"
@@ -121,10 +129,19 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
             />
           </button>
 
-          {/* Avatar – Desktop */}
           <button
             type="button"
-            className="hidden md:flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-semibold ml-2 transition-all duration-150"
+            onClick={handleLogout}
+            className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-150"
+            style={{ color: "var(--text)", opacity: 0.55 }}
+            aria-label="Logout"
+          >
+            <LogOut size={17} strokeWidth={1.9} />
+          </button>
+
+          <Link
+            href={profileHref}
+            className="hidden md:flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-semibold ml-1 transition-all duration-150"
             style={{
               background: "color-mix(in srgb, var(--primary) 12%, transparent)",
               color: "var(--primary)",
@@ -132,9 +149,8 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
             aria-label="Profil"
           >
             {avatarLetter}
-          </button>
+          </Link>
 
-          {/* Burger – Mobile */}
           <button
             type="button"
             className="flex md:hidden h-9 w-9 items-center justify-center rounded-lg transition-all duration-150"
@@ -147,7 +163,6 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {menuOpen && (
         <div
           className="md:hidden px-4 py-3 flex flex-col gap-0.5"
@@ -174,8 +189,9 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
             );
           })}
 
-          {/* Mobile Avatar Row */}
-          <div
+          <Link
+            href={profileHref}
+            onClick={() => setMenuOpen(false)}
             className="flex items-center gap-3 px-3 py-3 mt-2"
             style={{ borderTop: "1px solid var(--secondary)" }}
           >
@@ -191,7 +207,17 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
             <span className="text-[14px] font-medium" style={{ color: "var(--text)", opacity: 0.7 }}>
               {userName}
             </span>
-          </div>
+          </Link>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] font-medium text-text/70"
+            style={{ borderTop: "1px solid var(--secondary)" }}
+          >
+            <LogOut size={16} strokeWidth={1.9} />
+            Logout
+          </button>
         </div>
       )}
     </header>
