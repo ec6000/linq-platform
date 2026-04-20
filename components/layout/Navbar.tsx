@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, LayoutDashboard, Search, Wrench, FileText, Menu, X, ShoppingBag } from "lucide-react";
+import {
+  Bell,
+  LayoutDashboard,
+  Search,
+  Wrench,
+  FileText,
+  Menu,
+  X,
+  ShoppingBag,
+  Settings,
+} from "lucide-react";
 import { useState } from "react";
 import "@/app/globals.css";
 import { Expletus_Sans } from "next/font/google";
@@ -23,6 +33,7 @@ const providerNavItems = [
   { label: "Aufträge finden", href: "/find-jobs", icon: Search },
   { label: "Meine Services", href: "/my-services", icon: Wrench },
   { label: "Rechnungen", href: "/invoices", icon: FileText },
+  { label: "Einstellungen", href: "/profile", icon: Settings },
 ];
 
 const customerNavItems = [
@@ -30,12 +41,8 @@ const customerNavItems = [
   { label: "Services finden", href: "/find-services", icon: Search },
   { label: "Meine Aufträge", href: "/my-orders", icon: ShoppingBag },
   { label: "Rechnungen", href: "/invoices", icon: FileText },
+  { label: "Einstellungen", href: "/profile", icon: Settings },
 ];
-
-interface NavbarProps {
-  userRole?: "provider" | "customer";
-  userName?: string;
-}
 
 export default function Navbar({ userRole = "provider", userName = "E" }: NavbarProps) {
   const pathname = usePathname();
@@ -51,7 +58,6 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
     >
       <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-6 md:px-10">
 
-        {/* Logo */}
         <Link
           href="/dashboard"
           className="text-[22px] font-bold tracking-tight"
@@ -62,7 +68,6 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
           </span>
         </Link>
 
-        {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -97,9 +102,7 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
           })}
         </nav>
 
-        {/* Rechts: Bell + Avatar + Burger */}
         <div className="flex items-center gap-1">
-          {/* Bell */}
           <button
             type="button"
             className="relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-150"
@@ -121,9 +124,8 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
             />
           </button>
 
-          {/* Avatar – Desktop */}
-          <button
-            type="button"
+          <Link
+            href="/profile"
             className="hidden md:flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-semibold ml-2 transition-all duration-150"
             style={{
               background: "color-mix(in srgb, var(--primary) 12%, transparent)",
@@ -132,9 +134,8 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
             aria-label="Profil"
           >
             {avatarLetter}
-          </button>
+          </Link>
 
-          {/* Burger – Mobile */}
           <button
             type="button"
             className="flex md:hidden h-9 w-9 items-center justify-center rounded-lg transition-all duration-150"
@@ -147,7 +148,6 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {menuOpen && (
         <div
           className="md:hidden px-4 py-3 flex flex-col gap-0.5"
@@ -174,8 +174,9 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
             );
           })}
 
-          {/* Mobile Avatar Row */}
-          <div
+          <Link
+            href="/profile"
+            onClick={() => setMenuOpen(false)}
             className="flex items-center gap-3 px-3 py-3 mt-2"
             style={{ borderTop: "1px solid var(--secondary)" }}
           >
@@ -191,7 +192,7 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
             <span className="text-[14px] font-medium" style={{ color: "var(--text)", opacity: 0.7 }}>
               {userName}
             </span>
-          </div>
+          </Link>
         </div>
       )}
     </header>
