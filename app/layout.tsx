@@ -1,5 +1,14 @@
-import { AuthProvider } from "@/components/auth/AuthProvider"
-import AppShell from "@/components/layout/AppShell"
+import type { Metadata } from "next";
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  // Fallback – wird pro Route (z. B. in der Landingpage) überschrieben
+  title: {
+    default: "LiNQ",
+    template: "%s | LiNQ",
+  },
+};
 
 export default function RootLayout({
   children,
@@ -9,9 +18,7 @@ export default function RootLayout({
   return (
     <html lang="de">
       <body>
-        <AuthProvider>
-          <AppShell>{children}</AppShell>
-        </AuthProvider>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
