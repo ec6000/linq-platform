@@ -1,6 +1,8 @@
 import Link from "next/link"
 import { ArrowRight, CalendarDays, MapPin } from "lucide-react"
 import { Order, OrderStatus } from "@/lib/types/order"
+import { useCategories } from "@/lib/hooks/useCategory"
+import { findCategoryByOrderValue } from "@/lib/utils/categoryMatching"
 
 const statusStyles: Record<OrderStatus, string> = {
   [OrderStatus.available]: "bg-accent/10 text-accent",
@@ -37,6 +39,7 @@ function formatTimeWindow(order: Order) {
 
 export default function OrderCard({ order, matchingScore, categoryName }: OrderCardProps) {
   const budget = (order.budgetInCent / 100).toLocaleString("de-DE")
+  const category = findCategoryByOrderValue(categories, order.categoryId)
 
   return (
     <article className="rounded-2xl border border-secondary bg-background px-4 py-4 transition hover:border-primary/30 hover:shadow-sm sm:px-6 sm:py-5">
