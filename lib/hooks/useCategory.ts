@@ -15,10 +15,16 @@ export function useCategories() {
       try {
         const snapshot = await getDocs(collection(db, "categories"))
 
-        const data: Category[] = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as Omit<Category, "id">),
-        }))
+        const data: Category[] = snapshot.docs.map((doc) => {
+          const raw = doc.data() as Partial<Category> & { categoryId?: string }
+
+          return {
+            id: raw.id ?? raw.categoryId ?? doc.id,
+            firestoreId: doc.id,
+            name: raw.name ?? doc.id,
+            subcategories: raw.subcategories ?? [],
+          }
+        })
 
         setCategories(data)
       } catch (err) {

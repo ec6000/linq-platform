@@ -1,5 +1,6 @@
 export type Category = {
   id: string
+  firestoreId?: string
   name: string
   subcategories: Subcategory[]
 }
