@@ -1,19 +1,20 @@
-"use client"
-
-import { useState } from "react"
+import Link from "next/link"
+import { ArrowRight, CalendarDays, MapPin } from "lucide-react"
 import { Order, OrderStatus } from "@/lib/types/order"
-import { useMyOffer } from "@/lib/hooks/useMyOffer"
-import OfferModal from "./OfferModal"
 
 const statusStyles: Record<OrderStatus, string> = {
   [OrderStatus.available]: "bg-accent/10 text-accent",
   [OrderStatus.assigned]: "bg-secondary text-text/40",
+  [OrderStatus.inProgress]: "bg-primary/10 text-primary",
+  [OrderStatus.completed]: "bg-secondary text-text/40",
   [OrderStatus.cancelled]: "bg-secondary text-text/40",
 }
 
 const statusLabel: Record<OrderStatus, string> = {
   [OrderStatus.available]: "Verfügbar",
   [OrderStatus.assigned]: "Vergeben",
+  [OrderStatus.inProgress]: "In Arbeit",
+  [OrderStatus.completed]: "Abgeschlossen",
   [OrderStatus.cancelled]: "Storniert",
 }
 
@@ -21,91 +22,58 @@ interface OrderCardProps {
   order: Order
 }
 
-export default function OrderCard({ order }: OrderCardProps) {
-  const [status] = useState<OrderStatus>(order.status)
-  const [modalOpen, setModalOpen] = useState(false)
-  const { offer, deleting, withdrawOffer } = useMyOffer(order.id)
+function formatTimeWindow(order: Order) {
+  const start = order.timeWindow.start.toDate()
+  const end = order.timeWindow.end.toDate()
 
-  const isAvailable = status === OrderStatus.available
-  const isInactive = status === OrderStatus.assigned || status === OrderStatus.cancelled
-  const hasOffer = !!offer
+  const day = start.toLocaleDateString("de-DE")
+  const startTime = start.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+  const endTime = end.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+
+  return `${day} · ${startTime}–${endTime}`
+}
+
+export default function OrderCard({ order }: OrderCardProps) {
+  const budget = (order.budgetInCent / 100).toLocaleString("de-DE")
 
   return (
-    <div
-      className={`rounded-2xl border bg-background px-4 py-4 sm:px-6 sm:py-5 transition ${
-        isAvailable
-          ? "border-secondary hover:border-primary/30 hover:shadow-sm"
-          : "border-secondary opacity-60"
-      }`}
-    >
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        {/* Titel + Meta */}
-        <div className="flex flex-col gap-1 min-w-0">
-          <span className="text-[15px] font-medium text-text leading-snug">
-            {order.title}
-          </span>
-          <span className="text-[13px] text-text/50">
-            {order.customerName} · {order.date.toDate().toLocaleDateString("de-DE")}
-          </span>
-        </div>
-
-        {/* Status + Budget — auf Mobile: eigene Zeile, links-rechts aufgeteilt */}
-        <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 sm:gap-1 shrink-0">
-          <span
-            className={`rounded-full px-3 py-1 text-[12px] font-medium ${statusStyles[status]}`}
-          >
-            {statusLabel[status]}
-          </span>
-          <div className="flex flex-col items-end gap-0.5">
-            <span className="text-[15px] font-semibold text-text">
-              {(order.budgetInCent / 100).toLocaleString("de-DE")}€
+    <article className="rounded-2xl border border-secondary bg-background px-4 py-4 transition hover:border-primary/30 hover:shadow-sm sm:px-6 sm:py-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-[15px] font-medium leading-snug text-text">{order.title}</h2>
+            <span className={`rounded-full px-3 py-1 text-[12px] font-medium ${statusStyles[order.status]}`}>
+              {statusLabel[order.status]}
             </span>
-            {hasOffer && (
-              <span className="text-[11px] text-accent font-medium">
-                Dein Angebot: {(offer.priceInCent / 100).toLocaleString("de-DE")}€
-              </span>
+          </div>
+
+          <div className="space-y-1 text-[13px] text-text/60">
+            <p className="flex items-center gap-1.5">
+              <CalendarDays size={14} className="text-text/40" />
+              {formatTimeWindow(order)}
+              {order.timeWindow.isFlexible && <span className="text-[12px] text-text/40">(flexibel)</span>}
+            </p>
+
+            {order.address && (
+              <p className="flex items-center gap-1.5 truncate">
+                <MapPin size={14} className="shrink-0 text-text/40" />
+                <span className="truncate">{order.address}</span>
+              </p>
             )}
           </div>
         </div>
-      </div>
 
-      <div className="my-4 border-t border-secondary" />
-
-      {/* Footer */}
-      <div className="flex items-center justify-end gap-2">
-        {isAvailable && !hasOffer && (
-          <button
-            type="button"
-            onClick={() => setModalOpen(true)}
-            className="w-full sm:w-auto rounded-xl bg-primary px-4 py-2 text-[13px] font-medium text-white transition hover:bg-primary/90 text-center"
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <span className="text-[15px] font-semibold text-text">{budget}€</span>
+          <Link
+            href={`/find-jobs/${order.id}`}
+            className="inline-flex items-center gap-1 rounded-xl border border-secondary px-3 py-1.5 text-[13px] font-medium text-text/70 transition hover:border-primary/30 hover:text-text"
           >
-            Angebot senden
-          </button>
-        )}
-
-        {isAvailable && hasOffer && (
-          <button
-            type="button"
-            disabled={deleting}
-            onClick={withdrawOffer}
-            className="w-full sm:w-auto rounded-xl border border-red-200 px-4 py-2 text-[13px] font-medium text-red-400 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50 text-center"
-          >
-            {deleting ? "…" : "Angebot zurückziehen"}
-          </button>
-        )}
-
-        {isInactive && (
-          <span className="text-[13px] text-text/40">{statusLabel[status]}</span>
-        )}
+            Details
+            <ArrowRight size={14} />
+          </Link>
+        </div>
       </div>
-
-      <OfferModal
-        orderId={order.id}
-        orderTitle={order.title}
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-      />
-    </div>
+    </article>
   )
 }
