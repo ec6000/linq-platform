@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { ArrowRight, CalendarDays, MapPin } from "lucide-react"
 import { Order, OrderStatus } from "@/lib/types/order"
@@ -39,7 +41,7 @@ function formatTimeWindow(order: Order) {
 
 export default function OrderCard({ order, matchingScore, categoryName }: OrderCardProps) {
   const budget = (order.budgetInCent / 100).toLocaleString("de-DE")
-  const category = findCategoryByOrderValue(categories, order.categoryId)
+  const resolvedCategoryLabel = categoryName ?? `ID: ${order.categoryId}`
 
   return (
     <article className="rounded-2xl border border-secondary bg-background px-4 py-4 transition hover:border-primary/30 hover:shadow-sm sm:px-6 sm:py-5">
@@ -48,7 +50,7 @@ export default function OrderCard({ order, matchingScore, categoryName }: OrderC
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-[15px] font-medium leading-snug text-text">{order.title}</h2>
             <span className="rounded-full border border-secondary px-3 py-1 text-[12px] text-text/70">
-              {categoryName ?? `ID: ${order.categoryId}`}
+              {resolvedCategoryLabel}
             </span>
             {typeof matchingScore === "number" && (
               <span className="rounded-full bg-primary/10 px-3 py-1 text-[12px] font-medium text-primary">
