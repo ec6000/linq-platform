@@ -47,11 +47,9 @@ export default function OrderCard({ order, matchingScore, categoryName }: OrderC
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-[15px] font-medium leading-snug text-text">{order.title}</h2>
-            {categoryName && (
-              <span className="rounded-full border border-secondary px-3 py-1 text-[12px] text-text/70">
-                {categoryName}
-              </span>
-            )}
+            <span className="rounded-full border border-secondary px-3 py-1 text-[12px] text-text/70">
+              {categoryName ?? `ID: ${order.categoryId}`}
+            </span>
             {typeof matchingScore === "number" && (
               <span className="rounded-full bg-primary/10 px-3 py-1 text-[12px] font-medium text-primary">
                 Score: {matchingScore}
