@@ -3,6 +3,8 @@
 import Link from "next/link"
 import { ArrowRight, CalendarDays, MapPin } from "lucide-react"
 import { Order, OrderStatus } from "@/lib/types/order"
+import { useCategories } from "@/lib/hooks/useCategory"
+import { findCategoryByOrderValue } from "@/lib/utils/categoryMatching"
 
 const statusStyles: Record<OrderStatus, string> = {
   [OrderStatus.available]: "bg-accent/10 text-accent",
