@@ -1,11 +1,12 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ClipboardList, MapPin, Search, SlidersHorizontal, Tag } from "lucide-react"
 import { useOrders } from "@/lib/hooks/useOrders"
 import { useCategories } from "@/lib/hooks/useCategory"
 import OrderCard from "@/components/find-jobs/OrderCard"
 import { OrderStatus } from "@/lib/types/order"
+import { findCategoryByOrderValue, matchesCategoryIdentifier } from "@/lib/utils/categoryMatching"
 
 type Coordinates = {
   lat: number
@@ -46,6 +47,10 @@ export default function FindOrders() {
     const searchForCologne =
       normalizedLocationQuery.includes("köln") || normalizedLocationQuery.includes("koeln")
 
+    const selectedCategories = categories.filter((category) =>
+      selectedCategoryIds.includes(category.id)
+    )
+
     return orders
       .filter((order) => order.status === OrderStatus.available)
       .map((order) => {
@@ -66,7 +71,9 @@ export default function FindOrders() {
 
         const matchesCategory =
           selectedCategoryIds.length === 0 ||
-          selectedCategoryIds.includes(order.categoryId)
+          selectedCategories.some((category) =>
+            matchesCategoryIdentifier(category, order.categoryId)
+          )
 
         const textScore =
           normalizedQuery.length === 0 ? 20 : titleMatch ? 35 : customerMatch ? 20 : 0
@@ -80,6 +87,9 @@ export default function FindOrders() {
 
         return {
           ...order,
+          categoryName: selectedCategories.length > 0
+            ? selectedCategories.find((category) => matchesCategoryIdentifier(category, order.categoryId))?.name
+            : findCategoryByOrderValue(categories, order.categoryId)?.name,
           matchingScore: textScore + categoryScore + locationScore,
           matchesText,
           matchesCategory,
@@ -96,7 +106,30 @@ export default function FindOrders() {
         )
       })
       .sort((a, b) => b.matchingScore - a.matchingScore)
-  }, [locationQuery, orders, query, radiusKm, selectedCategoryIds])
+  }, [categories, locationQuery, orders, query, radiusKm, selectedCategoryIds])
+
+  useEffect(() => {
+    if (orders.length === 0) {
+      return
+    }
+
+    const unmatchedOrderCategoryIds = orders
+      .filter((order) => !findCategoryByOrderValue(categories, order.categoryId))
+      .map((order) => order.categoryId)
+
+    console.info("[find-jobs][category-debug]", {
+      categoriesLoaded: categories.length,
+      selectedCategoryIds,
+      sampleCategoryMappings: categories.slice(0, 5).map((category) => ({
+        id: category.id,
+        firestoreId: category.firestoreId,
+        name: category.name,
+      })),
+      uniqueOrderCategoryIds: [...new Set(orders.map((order) => order.categoryId))],
+      unmatchedOrderCategoryIds: [...new Set(unmatchedOrderCategoryIds)],
+      visibleOrdersAfterFilter: filtered.length,
+    })
+  }, [categories, filtered.length, orders, selectedCategoryIds])
 
   const locationHint = useMemo(() => {
     if (!locationQuery.trim()) {
@@ -242,7 +275,12 @@ export default function FindOrders() {
 
       <div className="flex flex-col gap-3">
         {filtered.map((order) => (
-          <OrderCard key={order.id} order={order} matchingScore={order.matchingScore} />
+          <OrderCard
+            key={order.id}
+            order={order}
+            matchingScore={order.matchingScore}
+            categoryName={order.categoryName}
+          />
         ))}
       </div>
     </main>

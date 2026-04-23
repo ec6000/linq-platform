@@ -61,7 +61,7 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
 
   return (
     <header
-      className="w-full bg-background"
+      className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur"
       style={{ borderBottom: "1px solid var(--secondary)" }}
     >
       <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-6 md:px-10">
