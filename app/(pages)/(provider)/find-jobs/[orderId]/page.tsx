@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import { ArrowLeft, CalendarDays, CircleDollarSign, MapPin, UserRound } from "lucide-react"
 import OfferModal from "@/components/find-jobs/OfferModal"
@@ -10,6 +10,7 @@ import { useCategories } from "@/lib/hooks/useCategory"
 import { useMyOffer } from "@/lib/hooks/useMyOffer"
 import { useOrders } from "@/lib/hooks/useOrders"
 import { Order, OrderStatus } from "@/lib/types/order"
+import { findCategoryByOrderValue } from "@/lib/utils/categoryMatching"
 
 const statusStyles: Record<OrderStatus, string> = {
   [OrderStatus.available]: "bg-accent/10 text-accent",
@@ -25,6 +26,10 @@ const statusLabel: Record<OrderStatus, string> = {
   [OrderStatus.inProgress]: "In Arbeit",
   [OrderStatus.completed]: "Abgeschlossen",
   [OrderStatus.cancelled]: "Storniert",
+}
+
+function normalize(value?: string) {
+  return value?.trim().toLowerCase()
 }
 
 function formatDateTimeRange(order: Order) {
@@ -54,8 +59,32 @@ export default function DetailedOrderPage() {
   const order = useMemo(() => orders.find((item) => item.id === orderId), [orders, orderId])
   const { offer, deleting, withdrawOffer } = useMyOffer(orderId)
 
-  const category = categories.find((item) => item.id === order?.categoryId)
-  const subcategory = category?.subcategories.find((item) => item.id === order?.subcategoryId)
+  const category = findCategoryByOrderValue(categories, order?.categoryId)
+  const subcategory = category?.subcategories.find((item) => {
+    if (!order?.subcategoryId) {
+      return false
+    }
+
+    const target = normalize(order.subcategoryId)
+    return target === normalize(item.id) || target === normalize(item.name)
+  })
+
+  useEffect(() => {
+    if (!order) {
+      return
+    }
+
+    console.info("[order-detail][category-debug]", {
+      orderId: order.id,
+      orderCategoryId: order.categoryId,
+      orderSubcategoryId: order.subcategoryId,
+      resolvedCategory: category
+        ? { id: category.id, firestoreId: category.firestoreId, name: category.name }
+        : null,
+      resolvedSubcategory: subcategory ? { id: subcategory.id, name: subcategory.name } : null,
+      categoriesLoaded: categories.length,
+    })
+  }, [categories.length, category, order, subcategory])
 
   if (loading) {
     return <main className="mx-auto max-w-[1100px] px-6 py-10 text-sm text-text/40">Auftrag wird geladen…</main>
