@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import { ArrowLeft, CalendarDays, CircleDollarSign, MapPin, UserRound } from "lucide-react"
 import OfferModal from "@/components/find-jobs/OfferModal"
@@ -68,6 +68,23 @@ export default function DetailedOrderPage() {
     const target = normalize(order.subcategoryId)
     return target === normalize(item.id) || target === normalize(item.name)
   })
+
+  useEffect(() => {
+    if (!order) {
+      return
+    }
+
+    console.info("[order-detail][category-debug]", {
+      orderId: order.id,
+      orderCategoryId: order.categoryId,
+      orderSubcategoryId: order.subcategoryId,
+      resolvedCategory: category
+        ? { id: category.id, firestoreId: category.firestoreId, name: category.name }
+        : null,
+      resolvedSubcategory: subcategory ? { id: subcategory.id, name: subcategory.name } : null,
+      categoriesLoaded: categories.length,
+    })
+  }, [categories.length, category, order, subcategory])
 
   if (loading) {
     return <main className="mx-auto max-w-[1100px] px-6 py-10 text-sm text-text/40">Auftrag wird geladen…</main>
