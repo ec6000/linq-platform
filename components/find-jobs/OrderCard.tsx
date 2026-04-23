@@ -20,6 +20,7 @@ const statusLabel: Record<OrderStatus, string> = {
 
 interface OrderCardProps {
   order: Order
+  matchingScore?: number
 }
 
 function formatTimeWindow(order: Order) {
@@ -33,7 +34,7 @@ function formatTimeWindow(order: Order) {
   return `${day} · ${startTime}–${endTime}`
 }
 
-export default function OrderCard({ order }: OrderCardProps) {
+export default function OrderCard({ order, matchingScore }: OrderCardProps) {
   const budget = (order.budgetInCent / 100).toLocaleString("de-DE")
 
   return (
@@ -42,6 +43,11 @@ export default function OrderCard({ order }: OrderCardProps) {
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-[15px] font-medium leading-snug text-text">{order.title}</h2>
+            {typeof matchingScore === "number" && (
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-[12px] font-medium text-primary">
+                Score: {matchingScore}
+              </span>
+            )}
             <span className={`rounded-full px-3 py-1 text-[12px] font-medium ${statusStyles[order.status]}`}>
               {statusLabel[order.status]}
             </span>
