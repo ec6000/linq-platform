@@ -5,13 +5,15 @@ import { ClipboardList, MapPin, Search, SlidersHorizontal, Tag } from "lucide-re
 import { useOrders } from "@/lib/hooks/useOrders"
 import { useCategories } from "@/lib/hooks/useCategory"
 import OrderCard from "@/components/find-jobs/OrderCard"
+import { OrderStatus } from "@/lib/types/order"
 
 type Coordinates = {
   lat: number
   lon: number
 }
 
-const radiusOptions = [5, 10, 25, 50, 100]
+const radiusOptions = [5, 10, 15, 20]
+const cologneCenter: Coordinates = { lat: 50.9375, lon: 6.9603 }
 
 function haversineDistanceInKm(from: Coordinates, to: Coordinates) {
   const earthRadius = 6371
@@ -34,73 +36,81 @@ export default function FindOrders() {
 
   const [query, setQuery] = useState("")
   const [locationQuery, setLocationQuery] = useState("")
-  const [locationError, setLocationError] = useState<string | null>(null)
-  const [locationLoading, setLocationLoading] = useState(false)
-  const [searchCenter, setSearchCenter] = useState<Coordinates | null>(null)
-  const [radiusKm, setRadiusKm] = useState(25)
+  const [radiusKm, setRadiusKm] = useState(20)
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
 
   const filtered = useMemo(() => {
-    return orders.filter((order) => {
-      const matchesText =
-        order.title.toLowerCase().includes(query.toLowerCase()) ||
-        order.customerName.toLowerCase().includes(query.toLowerCase())
+    const normalizedQuery = query.trim().toLowerCase()
+    const normalizedLocationQuery = locationQuery.trim().toLowerCase()
+    const locationFilterActive = normalizedLocationQuery.length > 0
+    const searchForCologne =
+      normalizedLocationQuery.includes("köln") || normalizedLocationQuery.includes("koeln")
 
-      const matchesCategory =
-        selectedCategoryIds.length === 0 ||
-        selectedCategoryIds.includes(order.categoryId)
+    return orders
+      .filter((order) => order.status === OrderStatus.available)
+      .map((order) => {
+        const titleMatch = order.title.toLowerCase().includes(normalizedQuery)
+        const customerMatch = order.customerName.toLowerCase().includes(normalizedQuery)
+        const matchesText = normalizedQuery.length === 0 || titleMatch || customerMatch
 
-      const matchesRadius =
-        !searchCenter ||
-        haversineDistanceInKm(searchCenter, {
+        const distanceToCologne = haversineDistanceInKm(cologneCenter, {
           lat: order.location.latitude,
           lon: order.location.longitude,
-        }) <= radiusKm
+        })
 
-      return matchesText && matchesCategory && matchesRadius
-    })
-  }, [orders, query, radiusKm, searchCenter, selectedCategoryIds])
+        const matchesLocation =
+          !locationFilterActive || (searchForCologne && distanceToCologne <= 20)
 
-  const resolveLocation = async () => {
-    if (!locationQuery.trim()) {
-      setSearchCenter(null)
-      setLocationError(null)
-      return
-    }
+        const matchesRadius =
+          !locationFilterActive || (searchForCologne && distanceToCologne <= radiusKm)
 
-    setLocationLoading(true)
-    setLocationError(null)
+        const matchesCategory =
+          selectedCategoryIds.length === 0 ||
+          selectedCategoryIds.includes(order.categoryId)
 
-    try {
-      const params = new URLSearchParams({
-        q: locationQuery,
-        format: "jsonv2",
-        limit: "1",
-        countrycodes: "de",
+        const textScore =
+          normalizedQuery.length === 0 ? 20 : titleMatch ? 35 : customerMatch ? 20 : 0
+        const categoryScore =
+          selectedCategoryIds.length === 0 ? 20 : matchesCategory ? 30 : 0
+        const locationScore = !locationFilterActive
+          ? 20
+          : searchForCologne && matchesRadius
+            ? Math.max(0, Math.round(20 - distanceToCologne))
+            : 0
+
+        return {
+          ...order,
+          matchingScore: textScore + categoryScore + locationScore,
+          matchesText,
+          matchesCategory,
+          matchesLocation,
+          matchesRadius,
+        }
       })
+      .filter((order) => {
+        return (
+          order.matchesText &&
+          order.matchesCategory &&
+          order.matchesLocation &&
+          order.matchesRadius
+        )
+      })
+      .sort((a, b) => b.matchingScore - a.matchingScore)
+  }, [locationQuery, orders, query, radiusKm, selectedCategoryIds])
 
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`)
-
-      if (!response.ok) {
-        throw new Error("Ortssuche nicht erfolgreich")
-      }
-
-      const data = (await response.json()) as Array<{ lat: string; lon: string }>
-
-      if (!data.length) {
-        setSearchCenter(null)
-        setLocationError("Ort konnte nicht gefunden werden")
-        return
-      }
-
-      setSearchCenter({ lat: Number(data[0].lat), lon: Number(data[0].lon) })
-    } catch {
-      setSearchCenter(null)
-      setLocationError("Ortssuche ist momentan nicht verfügbar")
-    } finally {
-      setLocationLoading(false)
+  const locationHint = useMemo(() => {
+    if (!locationQuery.trim()) {
+      return null
     }
-  }
+
+    const normalizedLocationQuery = locationQuery.trim().toLowerCase()
+
+    if (!normalizedLocationQuery.includes("köln") && !normalizedLocationQuery.includes("koeln")) {
+      return "Aktuell wird nur Köln unterstützt. Bitte „Köln“ eingeben."
+    }
+
+    return "Radius wird als Distanz zum Kölner Zentrum berechnet (max. 20 km)."
+  }, [locationQuery])
 
   const toggleCategory = (categoryId: string) => {
     setSelectedCategoryIds((previous) =>
@@ -113,11 +123,11 @@ export default function FindOrders() {
   const resetFilters = () => {
     setQuery("")
     setLocationQuery("")
-    setLocationError(null)
-    setSearchCenter(null)
-    setRadiusKm(25)
+    setRadiusKm(20)
     setSelectedCategoryIds([])
   }
+
+  const locationFilterActive = locationQuery.trim().length > 0
 
   return (
     <main className="mx-auto max-w-[1600px] px-6 py-10">
@@ -150,30 +160,19 @@ export default function FindOrders() {
             />
           </div>
 
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <MapPin
-                size={15}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text/30"
-                strokeWidth={1.8}
-              />
-              <input
-                type="text"
-                placeholder="Ort oder PLZ eingeben"
-                value={locationQuery}
-                onChange={(e) => setLocationQuery(e.target.value)}
-                className="w-full rounded-xl border border-secondary bg-background py-2.5 pl-9 pr-4 text-[14px] text-text placeholder:text-text/30 outline-none transition focus:border-primary/40"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={resolveLocation}
-              disabled={locationLoading}
-              className="rounded-xl border border-secondary px-4 py-2 text-[13px] font-medium text-text transition hover:border-primary/40 disabled:opacity-60"
-            >
-              {locationLoading ? "Suche…" : "Suchen"}
-            </button>
+          <div className="relative">
+            <MapPin
+              size={15}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text/30"
+              strokeWidth={1.8}
+            />
+            <input
+              type="text"
+              placeholder="Aktuell unterstützt: Köln"
+              value={locationQuery}
+              onChange={(e) => setLocationQuery(e.target.value)}
+              className="w-full rounded-xl border border-secondary bg-background py-2.5 pl-9 pr-4 text-[14px] text-text placeholder:text-text/30 outline-none transition focus:border-primary/40"
+            />
           </div>
 
           <div className="flex items-center gap-3 rounded-xl border border-secondary px-3 py-2.5">
@@ -185,7 +184,7 @@ export default function FindOrders() {
               value={radiusKm}
               onChange={(e) => setRadiusKm(Number(e.target.value))}
               className="flex-1 bg-transparent text-[14px] text-text outline-none"
-              disabled={!searchCenter}
+              disabled={!locationFilterActive}
             >
               {radiusOptions.map((radius) => (
                 <option key={radius} value={radius}>
@@ -196,7 +195,7 @@ export default function FindOrders() {
           </div>
         </div>
 
-        {locationError && <p className="mt-2 text-xs text-red-500">{locationError}</p>}
+        {locationHint && <p className="mt-2 text-xs text-text/50">{locationHint}</p>}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5 pr-2 text-[13px] text-text/60">
@@ -243,7 +242,7 @@ export default function FindOrders() {
 
       <div className="flex flex-col gap-3">
         {filtered.map((order) => (
-          <OrderCard key={order.id} order={order} />
+          <OrderCard key={order.id} order={order} matchingScore={order.matchingScore} />
         ))}
       </div>
     </main>
