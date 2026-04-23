@@ -6,6 +6,7 @@ import { useOrders } from "@/lib/hooks/useOrders"
 import { useCategories } from "@/lib/hooks/useCategory"
 import OrderCard from "@/components/find-jobs/OrderCard"
 import { OrderStatus } from "@/lib/types/order"
+import { matchesCategoryIdentifier } from "@/lib/utils/categoryMatching"
 
 type Coordinates = {
   lat: number
@@ -46,6 +47,10 @@ export default function FindOrders() {
     const searchForCologne =
       normalizedLocationQuery.includes("köln") || normalizedLocationQuery.includes("koeln")
 
+    const selectedCategories = categories.filter((category) =>
+      selectedCategoryIds.includes(category.id)
+    )
+
     return orders
       .filter((order) => order.status === OrderStatus.available)
       .map((order) => {
@@ -66,7 +71,9 @@ export default function FindOrders() {
 
         const matchesCategory =
           selectedCategoryIds.length === 0 ||
-          selectedCategoryIds.includes(order.categoryId)
+          selectedCategories.some((category) =>
+            matchesCategoryIdentifier(category, order.categoryId)
+          )
 
         const textScore =
           normalizedQuery.length === 0 ? 20 : titleMatch ? 35 : customerMatch ? 20 : 0
@@ -96,7 +103,7 @@ export default function FindOrders() {
         )
       })
       .sort((a, b) => b.matchingScore - a.matchingScore)
-  }, [locationQuery, orders, query, radiusKm, selectedCategoryIds])
+  }, [categories, locationQuery, orders, query, radiusKm, selectedCategoryIds])
 
   const locationHint = useMemo(() => {
     if (!locationQuery.trim()) {
