@@ -13,6 +13,15 @@ type GeoapifyFeature = {
   }
 }
 
+type GeoapifySuggestion = {
+  label: string
+  lat: number
+  lon: number
+  city?: string
+  county?: string
+  street?: string
+}
+
 const COLOGNE_CENTER = { lat: 50.9375, lon: 6.9603 }
 const COLOGNE_FILTER_RADIUS_METERS = 30000
 
@@ -52,18 +61,26 @@ export async function GET(request: NextRequest) {
   const data = (await response.json()) as { features?: GeoapifyFeature[] }
 
   const results = (data.features ?? [])
-    .map((feature) => ({
-      label: feature.properties?.formatted,
-      lat: feature.properties?.lat,
-      lon: feature.properties?.lon,
-      city: feature.properties?.city,
-      county: feature.properties?.county,
-      street: feature.properties?.street,
-    }))
-    .filter((item): item is { label: string; lat: number; lon: number; city?: string; county?: string; street?: string } => {
-      if (!item.label || typeof item.lat !== "number" || typeof item.lon !== "number") {
-        return false
+    .map((feature): GeoapifySuggestion | null => {
+      const label = feature.properties?.formatted
+      const lat = feature.properties?.lat
+      const lon = feature.properties?.lon
+
+      if (!label || typeof lat !== "number" || typeof lon !== "number") {
+        return null
       }
+
+      return {
+        label,
+        lat,
+        lon,
+        city: feature.properties?.city,
+        county: feature.properties?.county,
+        street: feature.properties?.street,
+      }
+    })
+    .filter((item): item is GeoapifySuggestion => item !== null)
+    .filter((item) => {
 
       const normalizedCity = item.city?.toLowerCase()
       const normalizedCounty = item.county?.toLowerCase()
