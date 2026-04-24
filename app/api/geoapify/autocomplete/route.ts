@@ -5,8 +5,16 @@ type GeoapifyFeature = {
     formatted?: string
     lat?: number
     lon?: number
+    city?: string
+    county?: string
+    postcode?: string
+    street?: string
+    housenumber?: string
   }
 }
+
+const COLOGNE_CENTER = { lat: 50.9375, lon: 6.9603 }
+const COLOGNE_FILTER_RADIUS_METERS = 30000
 
 export async function GET(request: NextRequest) {
   const apiKey = process.env.GEOAPIFY_API_KEY
@@ -28,6 +36,11 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("text", text)
   url.searchParams.set("limit", String(safeLimit))
   url.searchParams.set("lang", "de")
+  url.searchParams.set("bias", `proximity:${COLOGNE_CENTER.lon},${COLOGNE_CENTER.lat}`)
+  url.searchParams.set(
+    "filter",
+    `countrycode:de|circle:${COLOGNE_CENTER.lon},${COLOGNE_CENTER.lat},${COLOGNE_FILTER_RADIUS_METERS}`
+  )
   url.searchParams.set("apiKey", apiKey)
 
   const response = await fetch(url.toString(), { cache: "no-store" })
@@ -43,10 +56,21 @@ export async function GET(request: NextRequest) {
       label: feature.properties?.formatted,
       lat: feature.properties?.lat,
       lon: feature.properties?.lon,
+      city: feature.properties?.city,
+      county: feature.properties?.county,
+      street: feature.properties?.street,
     }))
-    .filter((item): item is { label: string; lat: number; lon: number } => {
-      return Boolean(item.label) && typeof item.lat === "number" && typeof item.lon === "number"
+    .filter((item): item is { label: string; lat: number; lon: number; city?: string; county?: string; street?: string } => {
+      if (!item.label || typeof item.lat !== "number" || typeof item.lon !== "number") {
+        return false
+      }
+
+      const normalizedCity = item.city?.toLowerCase()
+      const normalizedCounty = item.county?.toLowerCase()
+
+      return normalizedCity?.includes("köln") || normalizedCity?.includes("koeln") || normalizedCounty?.includes("köln")
     })
+    .map(({ label, lat, lon }) => ({ label, lat, lon }))
 
   return NextResponse.json({ results })
 }

@@ -44,8 +44,14 @@ export default function FindOrders() {
   const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([])
   const [locationLoading, setLocationLoading] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
-  const [radiusKm, setRadiusKm] = useState(20)
+  const [radiusKm, setRadiusKm] = useState(5)
   const [selectedCategoryId, setSelectedCategoryId] = useState("")
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("")
+  const selectedCategory = useMemo(
+    () => categories.find((category) => category.id === selectedCategoryId),
+    [categories, selectedCategoryId]
+  )
+  const subcategoryOptions = selectedCategory?.subcategories ?? []
 
   useEffect(() => {
     if (locationQuery.trim().length < 2) {
@@ -101,8 +107,6 @@ export default function FindOrders() {
     const normalizedQuery = query.trim().toLowerCase()
     const locationFilterActive = Boolean(selectedLocation)
 
-    const selectedCategory = categories.find((category) => category.id === selectedCategoryId)
-
     return orders
       .filter((order) => order.status === OrderStatus.available)
       .map((order) => {
@@ -125,10 +129,14 @@ export default function FindOrders() {
 
         const matchesCategory =
           !selectedCategory || matchesCategoryIdentifier(selectedCategory, order.categoryId)
+        const matchesSubcategory =
+          !selectedSubcategoryId ||
+          order.subcategoryId.toLowerCase().trim() === selectedSubcategoryId.toLowerCase().trim()
 
         const textScore =
           normalizedQuery.length === 0 ? 20 : titleMatch ? 35 : customerMatch ? 20 : 0
         const categoryScore = !selectedCategory ? 20 : matchesCategory ? 30 : 0
+        const subcategoryScore = !selectedSubcategoryId ? 10 : matchesSubcategory ? 15 : 0
         const locationScore =
           !locationFilterActive || distanceToSelectedLocation === null
             ? 20
@@ -141,9 +149,10 @@ export default function FindOrders() {
           categoryName: selectedCategory
             ? (matchesCategory ? selectedCategory.nameDE : undefined)
             : findCategoryByOrderValue(categories, order.categoryId)?.nameDE,
-          matchingScore: textScore + categoryScore + locationScore,
+          matchingScore: textScore + categoryScore + subcategoryScore + locationScore,
           matchesText,
           matchesCategory,
+          matchesSubcategory,
           matchesLocation,
           matchesRadius,
         }
@@ -152,12 +161,13 @@ export default function FindOrders() {
         return (
           order.matchesText &&
           order.matchesCategory &&
+          order.matchesSubcategory &&
           order.matchesLocation &&
           order.matchesRadius
         )
       })
       .sort((a, b) => b.matchingScore - a.matchingScore)
-  }, [categories, orders, query, radiusKm, selectedCategoryId, selectedLocation])
+  }, [categories, orders, query, radiusKm, selectedCategory, selectedLocation, selectedSubcategoryId])
 
   useEffect(() => {
     if (orders.length === 0) {
@@ -191,7 +201,7 @@ export default function FindOrders() {
       return "Bitte einen Ort aus den Vorschlägen auswählen, damit der Radiusfilter aktiv wird."
     }
 
-    return "Radius wird als Distanz zum ausgewählten Ort berechnet."
+    return "Es werden nur Orte und Adressen in Köln vorgeschlagen. Radius wird zur ausgewählten Position berechnet."
   }, [locationQuery, selectedLocation])
 
   const resetFilters = () => {
@@ -200,8 +210,9 @@ export default function FindOrders() {
     setSelectedLocation(null)
     setLocationSuggestions([])
     setLocationError(null)
-    setRadiusKm(20)
+    setRadiusKm(5)
     setSelectedCategoryId("")
+    setSelectedSubcategoryId("")
   }
 
   const locationFilterActive = Boolean(selectedLocation)
@@ -245,7 +256,7 @@ export default function FindOrders() {
             />
             <input
               type="text"
-              placeholder="Ort suchen…"
+              placeholder="Ort oder Straße in Köln suchen…"
               value={locationQuery}
               onChange={(e) => {
                 const value = e.target.value
@@ -256,7 +267,7 @@ export default function FindOrders() {
             />
 
             {locationQuery.trim().length >= 2 && (
-              <div className="absolute left-0 right-0 z-20 mt-2 rounded-xl border border-secondary bg-background shadow-lg">
+              <div className="absolute left-0 right-0 z-20 mt-2 overflow-hidden rounded-2xl border border-secondary bg-background/95 shadow-xl backdrop-blur">
                 {locationLoading && (
                   <p className="px-3 py-2 text-xs text-text/60">Ortsvorschläge werden geladen…</p>
                 )}
@@ -275,7 +286,7 @@ export default function FindOrders() {
                         setSelectedLocation(suggestion)
                         setLocationSuggestions([])
                       }}
-                      className="block w-full border-b border-secondary/50 px-3 py-2 text-left text-sm text-text last:border-b-0 hover:bg-primary/5"
+                      className="block w-full border-b border-secondary/50 px-3 py-2 text-left text-sm text-text last:border-b-0 transition hover:bg-primary/10"
                     >
                       {suggestion.label}
                     </button>
@@ -284,7 +295,7 @@ export default function FindOrders() {
             )}
           </div>
 
-          <div className="flex items-center gap-3 rounded-xl border border-secondary px-3 py-2.5">
+          <div className="flex items-center gap-3 rounded-2xl border border-secondary bg-white/30 px-3 py-2.5 shadow-sm">
             <label htmlFor="radius" className="text-[13px] text-text/70 whitespace-nowrap">
               Radius
             </label>
@@ -292,7 +303,7 @@ export default function FindOrders() {
               id="radius"
               value={radiusKm}
               onChange={(e) => setRadiusKm(Number(e.target.value))}
-              className="flex-1 bg-transparent text-[14px] text-text outline-none"
+              className="flex-1 appearance-none bg-transparent text-[14px] text-text outline-none"
               disabled={!locationFilterActive}
             >
               {radiusOptions.map((radius) => (
@@ -320,13 +331,31 @@ export default function FindOrders() {
           <select
             id="category"
             value={selectedCategoryId}
-            onChange={(event) => setSelectedCategoryId(event.target.value)}
-            className="min-w-[220px] rounded-xl border border-secondary bg-background px-3 py-2.5 text-[14px] text-text outline-none transition focus:border-primary/40"
+            onChange={(event) => {
+              setSelectedCategoryId(event.target.value)
+              setSelectedSubcategoryId("")
+            }}
+            className="min-w-[220px] appearance-none rounded-2xl border border-secondary bg-white/30 px-3 py-2.5 text-[14px] text-text shadow-sm outline-none transition focus:border-primary/40"
           >
             <option value="">Alle Kategorien</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.nameDE}
+              </option>
+            ))}
+          </select>
+
+          <select
+            id="subcategory"
+            value={selectedSubcategoryId}
+            onChange={(event) => setSelectedSubcategoryId(event.target.value)}
+            disabled={!selectedCategory}
+            className="min-w-[220px] appearance-none rounded-2xl border border-secondary bg-white/30 px-3 py-2.5 text-[14px] text-text shadow-sm outline-none transition focus:border-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="">Alle Subkategorien</option>
+            {subcategoryOptions.map((subcategory) => (
+              <option key={subcategory.id} value={subcategory.id}>
+                {subcategory.nameDE}
               </option>
             ))}
           </select>
