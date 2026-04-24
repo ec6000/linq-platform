@@ -13,8 +13,11 @@ type Coordinates = {
   lon: number
 }
 
+type LocationSuggestion = Coordinates & {
+  label: string
+}
+
 const radiusOptions = [5, 10, 15, 20]
-const cologneCenter: Coordinates = { lat: 50.9375, lon: 6.9603 }
 
 function haversineDistanceInKm(from: Coordinates, to: Coordinates) {
   const earthRadius = 6371
@@ -37,15 +40,66 @@ export default function FindOrders() {
 
   const [query, setQuery] = useState("")
   const [locationQuery, setLocationQuery] = useState("")
+  const [selectedLocation, setSelectedLocation] = useState<LocationSuggestion | null>(null)
+  const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([])
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
   const [radiusKm, setRadiusKm] = useState(20)
   const [selectedCategoryId, setSelectedCategoryId] = useState("")
 
+  useEffect(() => {
+    if (locationQuery.trim().length < 2) {
+      setLocationSuggestions([])
+      setLocationLoading(false)
+      setLocationError(null)
+      return
+    }
+
+    if (selectedLocation && selectedLocation.label === locationQuery.trim()) {
+      return
+    }
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(async () => {
+      setLocationLoading(true)
+      setLocationError(null)
+
+      try {
+        const response = await fetch(
+          `/api/geoapify/autocomplete?text=${encodeURIComponent(locationQuery.trim())}&limit=5`,
+          { signal: controller.signal }
+        )
+
+        if (!response.ok) {
+          throw new Error("Autocomplete request failed")
+        }
+
+        const data = (await response.json()) as { results?: LocationSuggestion[] }
+        setLocationSuggestions(data.results ?? [])
+      } catch (autocompleteError) {
+        if (controller.signal.aborted) {
+          return
+        }
+
+        console.error("[find-jobs][location-autocomplete]", autocompleteError)
+        setLocationSuggestions([])
+        setLocationError("Ortsvorschläge konnten nicht geladen werden.")
+      } finally {
+        if (!controller.signal.aborted) {
+          setLocationLoading(false)
+        }
+      }
+    }, 300)
+
+    return () => {
+      controller.abort()
+      clearTimeout(timeoutId)
+    }
+  }, [locationQuery, selectedLocation])
+
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
-    const normalizedLocationQuery = locationQuery.trim().toLowerCase()
-    const locationFilterActive = normalizedLocationQuery.length > 0
-    const searchForCologne =
-      normalizedLocationQuery.includes("köln") || normalizedLocationQuery.includes("koeln")
+    const locationFilterActive = Boolean(selectedLocation)
 
     const selectedCategory = categories.find((category) => category.id === selectedCategoryId)
 
@@ -56,16 +110,18 @@ export default function FindOrders() {
         const customerMatch = order.customerName.toLowerCase().includes(normalizedQuery)
         const matchesText = normalizedQuery.length === 0 || titleMatch || customerMatch
 
-        const distanceToCologne = haversineDistanceInKm(cologneCenter, {
-          lat: order.location.latitude,
-          lon: order.location.longitude,
-        })
+        const distanceToSelectedLocation = selectedLocation
+          ? haversineDistanceInKm(selectedLocation, {
+              lat: order.location.latitude,
+              lon: order.location.longitude,
+            })
+          : null
 
-        const matchesLocation =
-          !locationFilterActive || (searchForCologne && distanceToCologne <= 20)
+        const matchesLocation = !locationFilterActive || Boolean(distanceToSelectedLocation !== null)
 
         const matchesRadius =
-          !locationFilterActive || (searchForCologne && distanceToCologne <= radiusKm)
+          !locationFilterActive ||
+          (distanceToSelectedLocation !== null && distanceToSelectedLocation <= radiusKm)
 
         const matchesCategory =
           !selectedCategory || matchesCategoryIdentifier(selectedCategory, order.categoryId)
@@ -73,11 +129,12 @@ export default function FindOrders() {
         const textScore =
           normalizedQuery.length === 0 ? 20 : titleMatch ? 35 : customerMatch ? 20 : 0
         const categoryScore = !selectedCategory ? 20 : matchesCategory ? 30 : 0
-        const locationScore = !locationFilterActive
-          ? 20
-          : searchForCologne && matchesRadius
-            ? Math.max(0, Math.round(20 - distanceToCologne))
-            : 0
+        const locationScore =
+          !locationFilterActive || distanceToSelectedLocation === null
+            ? 20
+            : matchesRadius
+              ? Math.max(0, Math.round(20 - distanceToSelectedLocation))
+              : 0
 
         return {
           ...order,
@@ -100,7 +157,7 @@ export default function FindOrders() {
         )
       })
       .sort((a, b) => b.matchingScore - a.matchingScore)
-  }, [categories, locationQuery, orders, query, radiusKm, selectedCategoryId])
+  }, [categories, orders, query, radiusKm, selectedCategoryId, selectedLocation])
 
   useEffect(() => {
     if (orders.length === 0) {
@@ -130,23 +187,24 @@ export default function FindOrders() {
       return null
     }
 
-    const normalizedLocationQuery = locationQuery.trim().toLowerCase()
-
-    if (!normalizedLocationQuery.includes("köln") && !normalizedLocationQuery.includes("koeln")) {
-      return "Aktuell wird nur Köln unterstützt. Bitte „Köln“ eingeben."
+    if (!selectedLocation) {
+      return "Bitte einen Ort aus den Vorschlägen auswählen, damit der Radiusfilter aktiv wird."
     }
 
-    return "Radius wird als Distanz zum Kölner Zentrum berechnet (max. 20 km)."
-  }, [locationQuery])
+    return "Radius wird als Distanz zum ausgewählten Ort berechnet."
+  }, [locationQuery, selectedLocation])
 
   const resetFilters = () => {
     setQuery("")
     setLocationQuery("")
+    setSelectedLocation(null)
+    setLocationSuggestions([])
+    setLocationError(null)
     setRadiusKm(20)
     setSelectedCategoryId("")
   }
 
-  const locationFilterActive = locationQuery.trim().length > 0
+  const locationFilterActive = Boolean(selectedLocation)
 
   return (
     <main className="mx-auto max-w-[1600px] px-6 py-10">
@@ -182,16 +240,48 @@ export default function FindOrders() {
           <div className="relative">
             <MapPin
               size={15}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text/30"
+              className="absolute left-3.5 top-3 text-text/30"
               strokeWidth={1.8}
             />
             <input
               type="text"
-              placeholder="Aktuell unterstützt: Köln"
+              placeholder="Ort suchen…"
               value={locationQuery}
-              onChange={(e) => setLocationQuery(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value
+                setLocationQuery(value)
+                setSelectedLocation(null)
+              }}
               className="w-full rounded-xl border border-secondary bg-background py-2.5 pl-9 pr-4 text-[14px] text-text placeholder:text-text/30 outline-none transition focus:border-primary/40"
             />
+
+            {locationQuery.trim().length >= 2 && (
+              <div className="absolute left-0 right-0 z-20 mt-2 rounded-xl border border-secondary bg-background shadow-lg">
+                {locationLoading && (
+                  <p className="px-3 py-2 text-xs text-text/60">Ortsvorschläge werden geladen…</p>
+                )}
+
+                {!locationLoading && locationSuggestions.length === 0 && !locationError && (
+                  <p className="px-3 py-2 text-xs text-text/60">Keine Ortsvorschläge gefunden.</p>
+                )}
+
+                {!locationLoading &&
+                  locationSuggestions.map((suggestion) => (
+                    <button
+                      key={`${suggestion.label}-${suggestion.lat}-${suggestion.lon}`}
+                      type="button"
+                      onClick={() => {
+                        setLocationQuery(suggestion.label)
+                        setSelectedLocation(suggestion)
+                        setLocationSuggestions([])
+                      }}
+                      className="block w-full border-b border-secondary/50 px-3 py-2 text-left text-sm text-text last:border-b-0 hover:bg-primary/5"
+                    >
+                      {suggestion.label}
+                    </button>
+                  ))}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3 rounded-xl border border-secondary px-3 py-2.5">
@@ -214,7 +304,9 @@ export default function FindOrders() {
           </div>
         </div>
 
-        {locationHint && <p className="mt-2 text-xs text-text/50">{locationHint}</p>}
+        {(locationHint || locationError) && (
+          <p className="mt-2 text-xs text-text/50">{locationError ?? locationHint}</p>
+        )}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <label
