@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "seed:orders": "tsx scripts/seedOrders.ts",
+    "seed:categ": "tsx scripts/seedCategories.ts",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

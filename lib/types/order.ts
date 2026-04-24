@@ -39,7 +39,6 @@ export interface Order {
   // Timestamps
   createdAt: Timestamp
   updatedAt: Timestamp
-  completedAt?: Timestamp
   cancelledAt?: Timestamp
 }
 
