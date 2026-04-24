@@ -38,7 +38,7 @@ export default function FindOrders() {
   const [query, setQuery] = useState("")
   const [locationQuery, setLocationQuery] = useState("")
   const [radiusKm, setRadiusKm] = useState(20)
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
+  const [selectedCategoryId, setSelectedCategoryId] = useState("")
 
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -47,9 +47,7 @@ export default function FindOrders() {
     const searchForCologne =
       normalizedLocationQuery.includes("köln") || normalizedLocationQuery.includes("koeln")
 
-    const selectedCategories = categories.filter((category) =>
-      selectedCategoryIds.includes(category.id)
-    )
+    const selectedCategory = categories.find((category) => category.id === selectedCategoryId)
 
     return orders
       .filter((order) => order.status === OrderStatus.available)
@@ -70,15 +68,11 @@ export default function FindOrders() {
           !locationFilterActive || (searchForCologne && distanceToCologne <= radiusKm)
 
         const matchesCategory =
-          selectedCategoryIds.length === 0 ||
-          selectedCategories.some((category) =>
-            matchesCategoryIdentifier(category, order.categoryId)
-          )
+          !selectedCategory || matchesCategoryIdentifier(selectedCategory, order.categoryId)
 
         const textScore =
           normalizedQuery.length === 0 ? 20 : titleMatch ? 35 : customerMatch ? 20 : 0
-        const categoryScore =
-          selectedCategoryIds.length === 0 ? 20 : matchesCategory ? 30 : 0
+        const categoryScore = !selectedCategory ? 20 : matchesCategory ? 30 : 0
         const locationScore = !locationFilterActive
           ? 20
           : searchForCologne && matchesRadius
@@ -87,9 +81,9 @@ export default function FindOrders() {
 
         return {
           ...order,
-          categoryName: selectedCategories.length > 0
-            ? selectedCategories.find((category) => matchesCategoryIdentifier(category, order.categoryId))?.name
-            : findCategoryByOrderValue(categories, order.categoryId)?.name,
+          categoryName: selectedCategory
+            ? (matchesCategory ? selectedCategory.nameDE : undefined)
+            : findCategoryByOrderValue(categories, order.categoryId)?.nameDE,
           matchingScore: textScore + categoryScore + locationScore,
           matchesText,
           matchesCategory,
@@ -106,7 +100,7 @@ export default function FindOrders() {
         )
       })
       .sort((a, b) => b.matchingScore - a.matchingScore)
-  }, [categories, locationQuery, orders, query, radiusKm, selectedCategoryIds])
+  }, [categories, locationQuery, orders, query, radiusKm, selectedCategoryId])
 
   useEffect(() => {
     if (orders.length === 0) {
@@ -119,17 +113,17 @@ export default function FindOrders() {
 
     console.info("[find-jobs][category-debug]", {
       categoriesLoaded: categories.length,
-      selectedCategoryIds,
+      selectedCategoryId,
       sampleCategoryMappings: categories.slice(0, 5).map((category) => ({
         id: category.id,
         firestoreId: category.firestoreId,
-        name: category.name,
+        nameDE: category.nameDE,
       })),
       uniqueOrderCategoryIds: [...new Set(orders.map((order) => order.categoryId))],
       unmatchedOrderCategoryIds: [...new Set(unmatchedOrderCategoryIds)],
       visibleOrdersAfterFilter: filtered.length,
     })
-  }, [categories, filtered.length, orders, selectedCategoryIds])
+  }, [categories, filtered.length, orders, selectedCategoryId])
 
   const locationHint = useMemo(() => {
     if (!locationQuery.trim()) {
@@ -145,19 +139,11 @@ export default function FindOrders() {
     return "Radius wird als Distanz zum Kölner Zentrum berechnet (max. 20 km)."
   }, [locationQuery])
 
-  const toggleCategory = (categoryId: string) => {
-    setSelectedCategoryIds((previous) =>
-      previous.includes(categoryId)
-        ? previous.filter((id) => id !== categoryId)
-        : [...previous, categoryId]
-    )
-  }
-
   const resetFilters = () => {
     setQuery("")
     setLocationQuery("")
     setRadiusKm(20)
-    setSelectedCategoryIds([])
+    setSelectedCategoryId("")
   }
 
   const locationFilterActive = locationQuery.trim().length > 0
@@ -231,29 +217,27 @@ export default function FindOrders() {
         {locationHint && <p className="mt-2 text-xs text-text/50">{locationHint}</p>}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5 pr-2 text-[13px] text-text/60">
+          <label
+            htmlFor="category"
+            className="flex items-center gap-1.5 pr-2 text-[13px] text-text/60"
+          >
             <Tag size={14} />
             Kategorien
-          </div>
+          </label>
 
-          {categories.map((category) => {
-            const active = selectedCategoryIds.includes(category.id)
-
-            return (
-              <button
-                key={category.id}
-                type="button"
-                onClick={() => toggleCategory(category.id)}
-                className={`rounded-full border px-3 py-1 text-[12px] transition ${
-                  active
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-secondary text-text/70 hover:border-primary/30"
-                }`}
-              >
-                {category.name}
-              </button>
-            )
-          })}
+          <select
+            id="category"
+            value={selectedCategoryId}
+            onChange={(event) => setSelectedCategoryId(event.target.value)}
+            className="min-w-[220px] rounded-xl border border-secondary bg-background px-3 py-2.5 text-[14px] text-text outline-none transition focus:border-primary/40"
+          >
+            <option value="">Alle Kategorien</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.nameDE}
+              </option>
+            ))}
+          </select>
 
           <button
             type="button"

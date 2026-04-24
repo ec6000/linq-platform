@@ -42,7 +42,7 @@ export default function JobCard({ job }: JobCardProps) {
   const { updateJobStatus, loading, error } = useUpdateJobStatus()
   const { categories } = useCategories()
 
-  const categoryName = categories.find((c) => c.id === job.categoryId)?.name
+  const categoryName = categories.find((c) => c.id === job.categoryId)?.nameDE
 
   const nextStatus = getNextJobStatus(status)
   const isCancelled = status === JobStatus.cancelled
