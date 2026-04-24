@@ -1,12 +1,26 @@
-import { db } from "@/lib/firebase/firebase"
 import { collection, getDocs } from "firebase/firestore"
-import { Category } from "../types/category"
+import { db } from "@/lib/firebase/firebase"
+import type { Category } from "../types/category"
 
 export async function getCategories(): Promise<Category[]> {
-  const snapshot = await getDocs(collection(db, "categories"))
+  const preferredSnapshot = await getDocs(collection(db, "Categories"))
+  const fallbackSnapshot =
+    preferredSnapshot.empty
+      ? await getDocs(collection(db, "categories"))
+      : preferredSnapshot
 
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    name: doc.data().name,
-  }))
+  return fallbackSnapshot.docs
+    .filter((doc) => {
+      const raw = doc.data() as { isActive?: boolean }
+      return raw.isActive !== false
+    })
+    .map((doc) => {
+      const raw = doc.data() as { id?: string; categoryId?: string; nameDE?: string; name?: string }
+      return {
+        id: raw.id ?? raw.categoryId ?? doc.id,
+        firestoreId: doc.id,
+        nameDE: raw.nameDE ?? raw.name ?? doc.id,
+        subcategories: [],
+      }
+    })
 }

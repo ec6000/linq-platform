@@ -66,7 +66,7 @@ export default function DetailedOrderPage() {
     }
 
     const target = normalize(order.subcategoryId)
-    return target === normalize(item.id) || target === normalize(item.name)
+    return target === normalize(item.id) || target === normalize(item.nameDE)
   })
 
   useEffect(() => {
@@ -79,9 +79,9 @@ export default function DetailedOrderPage() {
       orderCategoryId: order.categoryId,
       orderSubcategoryId: order.subcategoryId,
       resolvedCategory: category
-        ? { id: category.id, firestoreId: category.firestoreId, name: category.name }
+        ? { id: category.id, firestoreId: category.firestoreId, nameDE: category.nameDE }
         : null,
-      resolvedSubcategory: subcategory ? { id: subcategory.id, name: subcategory.name } : null,
+      resolvedSubcategory: subcategory ? { id: subcategory.id, nameDE: subcategory.nameDE } : null,
       categoriesLoaded: categories.length,
     })
   }, [categories.length, category, order, subcategory])
@@ -120,7 +120,7 @@ export default function DetailedOrderPage() {
               </span>
               {category && (
                 <span className="rounded-full border border-secondary px-3 py-1 text-[12px]">
-                  {category.name}{subcategory ? ` · ${subcategory.name}` : ""}
+                  {category.nameDE}{subcategory ? ` · ${subcategory.nameDE}` : ""}
                 </span>
               )}
             </div>
