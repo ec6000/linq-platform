@@ -18,7 +18,7 @@ type LocationSuggestion = Coordinates & {
 }
 
 const radiusOptions = [5, 10, 15, 20]
-const ORDERS_PER_PAGE = 25
+const ORDERS_PER_PAGE = 10
 
 function haversineDistanceInKm(from: Coordinates, to: Coordinates) {
   const earthRadius = 6371

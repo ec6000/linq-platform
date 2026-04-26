@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "seed:services": "tsx scripts/seedServices.ts",
     "seed:orders": "tsx scripts/seedOrders.ts",
     "seed:categ": "tsx scripts/seedCategories.ts",
     "dev": "next dev",
