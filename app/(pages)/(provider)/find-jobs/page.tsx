@@ -18,6 +18,7 @@ type LocationSuggestion = Coordinates & {
 }
 
 const radiusOptions = [5, 10, 15, 20]
+const ORDERS_PER_PAGE = 25
 
 function haversineDistanceInKm(from: Coordinates, to: Coordinates) {
   const earthRadius = 6371
@@ -47,6 +48,7 @@ export default function FindOrders() {
   const [radiusKm, setRadiusKm] = useState(5)
   const [selectedCategoryId, setSelectedCategoryId] = useState("")
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId),
     [categories, selectedCategoryId]
@@ -216,6 +218,21 @@ export default function FindOrders() {
   }
 
   const locationFilterActive = Boolean(selectedLocation)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ORDERS_PER_PAGE))
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * ORDERS_PER_PAGE
+    return filtered.slice(start, start + ORDERS_PER_PAGE)
+  }, [currentPage, filtered])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [query, locationQuery, radiusKm, selectedCategoryId, selectedSubcategoryId])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
 
   return (
     <main className="mx-auto max-w-[1600px] px-6 py-10">
@@ -379,7 +396,7 @@ export default function FindOrders() {
       )}
 
       <div className="flex flex-col gap-3">
-        {filtered.map((order) => (
+        {paginatedOrders.map((order) => (
           <OrderCard
             key={order.id}
             order={order}
@@ -388,6 +405,32 @@ export default function FindOrders() {
           />
         ))}
       </div>
+
+      {!loading && !error && filtered.length > ORDERS_PER_PAGE && (
+        <div className="mt-6 flex items-center justify-between gap-3 text-sm text-text/70">
+          <p>
+            Seite {currentPage} von {totalPages}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={currentPage === 1}
+              className="rounded-lg border border-secondary px-3 py-1.5 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Zurück
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={currentPage === totalPages}
+              className="rounded-lg border border-secondary px-3 py-1.5 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Weiter
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
