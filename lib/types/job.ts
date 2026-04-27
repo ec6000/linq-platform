@@ -1,18 +1,57 @@
-import { Timestamp } from "firebase/firestore"
+import { Timestamp, GeoPoint } from "firebase/firestore"
+import { PricingType } from "./service"
 
 export interface Job {
   id: string
+
+  // Herkunft
+  sourceType: JobSourceType
+  sourceId: string // orderId oder serviceId
+  offerId?: string
+  bookingId?: string
+
+  // Beteiligte
+  customerId: string
+  providerId: string
+
+  // Snapshot
   title: string
-  customerName: string
-  status: JobStatus
-  date: Timestamp
-  priceInCent: number
+  description?: string
   categoryId: string
+  pricingType: PricingType
+  priceInCent?: number
+  minBudgetInCent?: number
+  maxBudgetInCent?: number
+
+  // Ort & Zeit
+  location?: GeoPoint
+  addressText?: string
+  scheduledAt?: Timestamp
+  scheduledDateText?: string
+
+  // Status
+  status: JobStatus
+
+  // Abschluss / Bewertung
+  customerRating?: number
+  providerRating?: number
+
+  // Meta
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  startedAt?: Timestamp
+  completedAt?: Timestamp
+  cancelledAt?: Timestamp
+}
+
+export enum JobSourceType {
+  order = "order",
+  service = "service",
 }
 
 export enum JobStatus {
-  open = "open",
-  inProgress = "in progress",
-  done = "done",
+  pending = "pending",
+  inProgress = "inProgress",
+  completed = "completed",
   cancelled = "cancelled",
 }
