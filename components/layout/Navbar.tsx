@@ -7,10 +7,8 @@ import {
   LayoutDashboard,
   Search,
   Wrench,
-  FileText,
   Menu,
   X,
-  Settings,
   LogOut,
 } from "lucide-react";
 import { useState } from "react";
@@ -34,14 +32,10 @@ const providerNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Aufträge finden", href: "/find-jobs", icon: Search },
   { label: "Meine Services", href: "/my-services", icon: Wrench },
-  { label: "Rechnungen", href: "/invoices", icon: FileText },
-  { label: "Einstellungen", href: "/profile", icon: Settings },
 ];
 
 const customerNavItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Rechnungen", href: "/invoices", icon: FileText },
-  { label: "Einstellungen", href: "/customer-profile", icon: Settings },
 ];
 
 export default function Navbar({ userRole = "provider", userName = "E" }: NavbarProps) {

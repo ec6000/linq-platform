@@ -9,7 +9,7 @@ import { useAuth } from "@/components/auth/AuthProvider"
 import { createService } from "@/lib/hooks/useCreateService"
 import { editService } from "@/lib/hooks/useEditService"
 
-const SERVICES_PER_PAGE = 25
+const SERVICES_PER_PAGE = 10
 
 type StatusFilter = "all" | ServiceStatus.active | ServiceStatus.inactive
 
