@@ -17,10 +17,7 @@ export default function Dashboard() {
   const { jobs, loading: jobsLoading, error: jobsError } = useJobs()
   const { bookings, loading: bookingsLoading, error: bookingsError } = useBookings()
 
-  const providerJobs = useMemo(
-    () => jobs.filter((job) => !user || job.providerId === user.uid),
-    [jobs, user],
-  )
+  const visibleJobs = useMemo(() => jobs, [jobs])
 
   const providerBookings = useMemo(
     () => bookings.filter((booking) => !user || booking.providerId === user.uid),
@@ -68,11 +65,11 @@ export default function Dashboard() {
           {jobsLoading && <p className="text-sm text-text/40">Jobs werden geladen…</p>}
           {jobsError && <p className="text-sm text-red-500">{jobsError}</p>}
 
-          {!jobsLoading && !jobsError && providerJobs.length === 0 && (
+          {!jobsLoading && !jobsError && visibleJobs.length === 0 && (
             <p className="text-sm text-text/40">Keine Jobs gefunden.</p>
           )}
 
-          {providerJobs.map((job) => (
+          {visibleJobs.map((job) => (
             <JobCard key={job.id} job={job} />
           ))}
         </section>
