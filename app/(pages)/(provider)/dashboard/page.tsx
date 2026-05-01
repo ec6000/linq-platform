@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { Briefcase, CalendarClock } from "lucide-react"
 import { useJobs } from "@/lib/hooks/useJobs"
 import { useBookings } from "@/lib/hooks/useBookings"
+import { useCategories } from "@/lib/hooks/useCategory"
 import JobCard from "@/components/dashboard/JobCard"
 import BookingCard from "@/components/dashboard/BookingCard"
 import { useAuth } from "@/components/auth/AuthProvider"
@@ -16,6 +17,21 @@ export default function Dashboard() {
 
   const { jobs, loading: jobsLoading, error: jobsError } = useJobs()
   const { bookings, loading: bookingsLoading, error: bookingsError } = useBookings()
+  const { categories } = useCategories()
+
+  const categoryLookup = useMemo(() => {
+    const byCategoryId = new Map<string, string>()
+    const bySubcategoryId = new Map<string, string>()
+
+    categories.forEach((category) => {
+      byCategoryId.set(category.id, category.nameDE)
+      category.subcategories.forEach((subcategory) => {
+        bySubcategoryId.set(subcategory.id, subcategory.nameDE)
+      })
+    })
+
+    return { byCategoryId, bySubcategoryId }
+  }, [categories])
 
   const visibleJobs = useMemo(() => jobs, [jobs])
 
@@ -70,7 +86,12 @@ export default function Dashboard() {
           )}
 
           {visibleJobs.map((job) => (
-            <JobCard key={job.id} job={job} />
+            <JobCard
+              key={job.id}
+              job={job}
+              categoryName={categoryLookup.byCategoryId.get(job.categoryId)}
+              subcategoryName={job.subcategoryId ? categoryLookup.bySubcategoryId.get(job.subcategoryId) : undefined}
+            />
           ))}
         </section>
       )}
