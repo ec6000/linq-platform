@@ -20,14 +20,11 @@ export interface Job {
   categoryId: string
   pricingType: PricingType
   priceInCent?: number
-  minBudgetInCent?: number
-  maxBudgetInCent?: number
 
   // Ort & Zeit
   location?: GeoPoint
   addressText?: string
   scheduledAt?: Timestamp
-  scheduledDateText?: string
 
   // Status
   status: JobStatus
