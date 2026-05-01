@@ -1,10 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { Job, JobSourceType, JobStatus } from "@/lib/types/job"
 import { PricingType } from "@/lib/types/service"
 import { useUpdateJobStatus } from "@/lib/hooks/useChangeJobStatus"
-import { useCategories } from "@/lib/hooks/useCategory"
 
 const statusStyles: Record<JobStatus, string> = {
   [JobStatus.pending]: "bg-accent/10 text-accent",
@@ -33,6 +32,8 @@ const pricingSuffix: Record<PricingType, string> = {
 
 interface JobCardProps {
   job: Job
+  categoryName?: string
+  subcategoryName?: string
 }
 
 function formatPrice(valueInCent: number | undefined, pricingType: PricingType) {
@@ -66,15 +67,9 @@ function getNextStatus(status: JobStatus) {
   return null
 }
 
-export default function JobCard({ job }: JobCardProps) {
+export default function JobCard({ job, categoryName, subcategoryName }: JobCardProps) {
   const [status, setStatus] = useState<JobStatus>(job.status)
   const { updateJobStatus, loading, error } = useUpdateJobStatus()
-  const { categories } = useCategories()
-
-  const categoryName = useMemo(
-    () => categories.find((category) => category.id === job.categoryId)?.nameDE,
-    [categories, job.categoryId],
-  )
 
   const nextStatus = getNextStatus(status)
   const canCancel = status === JobStatus.pending || status === JobStatus.inProgress
@@ -97,11 +92,19 @@ export default function JobCard({ job }: JobCardProps) {
       {/* Header: Meta-Pills + Status */}
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-[12px] text-text/55">
-          <span>{sourceLabel[job.sourceType]}</span>
+          <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 font-medium text-primary">
+            {sourceLabel[job.sourceType]}
+          </span>
           {categoryName && (
             <>
               <span className="text-text/25">·</span>
               <span>{categoryName}</span>
+            </>
+          )}
+          {subcategoryName && (
+            <>
+              <span className="text-text/25">·</span>
+              <span>{subcategoryName}</span>
             </>
           )}
         </div>

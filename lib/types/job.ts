@@ -18,6 +18,7 @@ export interface Job {
   title: string
   description?: string
   categoryId: string
+  subcategoryId?: string
   pricingType: PricingType
   priceInCent?: number
 
