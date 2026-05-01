@@ -16,7 +16,7 @@ export default function Dashboard() {
   const { user } = useAuth()
 
   const { jobs, loading: jobsLoading, error: jobsError } = useJobs()
-  const { bookings, loading: bookingsLoading, error: bookingsError } = useBookings()
+  const { bookings, loading: bookingsLoading, error: bookingsError } = useBookings(user?.uid)
   const { categories } = useCategories()
 
   const categoryLookup = useMemo(() => {
@@ -35,10 +35,7 @@ export default function Dashboard() {
 
   const visibleJobs = useMemo(() => jobs, [jobs])
 
-  const providerBookings = useMemo(
-    () => bookings.filter((booking) => !user || booking.providerId === user.uid),
-    [bookings, user],
-  )
+  const providerBookings = useMemo(() => bookings, [bookings])
 
   return (
     <main className="mx-auto max-w-[1600px] px-6 py-10">
