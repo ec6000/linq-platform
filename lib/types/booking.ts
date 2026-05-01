@@ -14,8 +14,7 @@ export interface Booking {
   categoryId: string
   pricingType: PricingType
   priceInCent?: number
-  minBudgetInCent?: number
-  maxBudgetInCent?: number
+  unitName?: string
 
   // 📝 Anfrage vom Kunden
   message?: string
