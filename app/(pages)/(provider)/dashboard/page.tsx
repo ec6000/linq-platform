@@ -7,16 +7,13 @@ import { useBookings } from "@/lib/hooks/useBookings"
 import { useCategories } from "@/lib/hooks/useCategory"
 import JobCard from "@/components/dashboard/JobCard"
 import BookingCard from "@/components/dashboard/BookingCard"
-import { useAuth } from "@/components/auth/AuthProvider"
 
 type DashboardTab = "jobs" | "bookings"
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<DashboardTab>("jobs")
-  const { user } = useAuth()
-
   const { jobs, loading: jobsLoading, error: jobsError } = useJobs()
-  const { bookings, loading: bookingsLoading, error: bookingsError } = useBookings(user?.uid)
+  const { bookings, loading: bookingsLoading, error: bookingsError } = useBookings()
   const { categories } = useCategories()
 
   const categoryLookup = useMemo(() => {
