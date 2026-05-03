@@ -48,6 +48,7 @@ export enum JobSourceType {
 }
 
 export enum JobStatus {
+  open = "open",
   pending = "pending",
   inProgress = "inProgress",
   completed = "completed",
