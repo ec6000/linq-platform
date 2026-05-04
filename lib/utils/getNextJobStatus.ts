@@ -5,8 +5,8 @@ export function getNextJobStatus(status: JobStatus): JobStatus | null {
     case JobStatus.open:
       return JobStatus.inProgress
     case JobStatus.inProgress:
-      return JobStatus.done
-    case JobStatus.done:
+      return JobStatus.completed
+    case JobStatus.completed:
       return null
     case JobStatus.cancelled:
       return null
