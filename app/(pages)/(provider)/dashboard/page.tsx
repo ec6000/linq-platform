@@ -7,11 +7,14 @@ import { useBookings } from "@/lib/hooks/useBookings"
 import { useCategories } from "@/lib/hooks/useCategory"
 import JobCard from "@/components/dashboard/JobCard"
 import BookingCard from "@/components/dashboard/BookingCard"
+import { JobStatus } from "@/lib/types/job"
 
 type DashboardTab = "jobs" | "bookings"
+type JobFilter = "all" | JobStatus.pending | JobStatus.inProgress | JobStatus.completed | JobStatus.cancelled
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<DashboardTab>("jobs")
+  const [activeJobFilter, setActiveJobFilter] = useState<JobFilter>("all")
   const { jobs, loading: jobsLoading, error: jobsError } = useJobs()
   const { bookings, loading: bookingsLoading, error: bookingsError } = useBookings()
   const { categories } = useCategories()
@@ -30,7 +33,10 @@ export default function Dashboard() {
     return { byCategoryId, bySubcategoryId }
   }, [categories])
 
-  const visibleJobs = useMemo(() => jobs, [jobs])
+  const visibleJobs = useMemo(() => {
+    if (activeJobFilter === "all") return jobs
+    return jobs.filter((job) => job.status === activeJobFilter)
+  }, [activeJobFilter, jobs])
 
   const providerBookings = useMemo(() => bookings, [bookings])
 
@@ -71,7 +77,38 @@ export default function Dashboard() {
       </div>
 
       {activeTab === "jobs" && (
-        <section className="flex flex-col gap-3">
+        <section>
+          <div className="mb-5 flex flex-wrap items-center gap-2">
+            {([
+              { key: "all", label: "Alle" },
+              { key: JobStatus.pending, label: "Ausstehend" },
+              { key: JobStatus.inProgress, label: "In Arbeit" },
+              { key: JobStatus.completed, label: "Abgeschlossen" },
+              { key: JobStatus.cancelled, label: "Storniert" },
+            ] as const).map((chip) => {
+              const selected = activeJobFilter === chip.key
+              return (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => setActiveJobFilter(chip.key)}
+                  className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${
+                    selected
+                      ? "border-primary/30 bg-primary/10 text-primary"
+                      : "border-secondary text-text/65 hover:bg-secondary"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="mb-5 rounded-2xl border border-secondary bg-background p-4 text-sm text-text/70">
+            Preisangebote findest du pro Auftrag in der Detailansicht unter <strong>Aufträge finden</strong>.
+          </div>
+
+          <div className="flex flex-col gap-3">
           {jobsLoading && <p className="text-sm text-text/40">Jobs werden geladen…</p>}
           {jobsError && <p className="text-sm text-red-500">{jobsError}</p>}
 
@@ -87,6 +124,7 @@ export default function Dashboard() {
               subcategoryName={job.subcategoryId ? categoryLookup.bySubcategoryId.get(job.subcategoryId) : undefined}
             />
           ))}
+          </div>
         </section>
       )}
 

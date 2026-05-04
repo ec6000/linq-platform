@@ -236,11 +236,9 @@ export default function FindOrders() {
 
   return (
     <main className="mx-auto max-w-[1600px] px-6 py-10">
-      <div className="mb-8 flex items-center gap-3">
+      <div className="mb-6 flex items-center gap-3">
         <ClipboardList size={22} className="text-primary" strokeWidth={1.8} />
-        <h1 className="text-[22px] font-semibold tracking-tight text-text">
-          Aufträge finden
-        </h1>
+        <h1 className="text-[22px] font-semibold tracking-tight text-text">Aufträge finden</h1>
       </div>
 
       <section className="mb-7 rounded-2xl border border-secondary bg-background p-4 sm:p-5">
