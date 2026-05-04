@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { X, Euro } from "lucide-react"
 import { useOffer } from "@/lib/hooks/useOffers"
+import { useAuth } from "@/components/auth/AuthProvider"
 
 interface OfferModalProps {
   orderId: string
@@ -23,6 +24,7 @@ export default function OfferModal({
   const [comment, setComment] = useState("")
   const [submitted, setSubmitted] = useState(false)
   const { createOffer, loading, error } = useOffer()
+  const { user } = useAuth()
   const priceRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -52,7 +54,8 @@ export default function OfferModal({
   async function handleSubmit() {
     if (!isValid || loading) return
     try {
-      await createOffer({ orderId, priceInCent, comment: comment.trim() })
+      if (!user) return
+      await createOffer({ orderId, orderTitle, priceInCent, comment: comment.trim(), providerId: user.uid })
       setSubmitted(true)
       setTimeout(() => {
         onSuccess?.()

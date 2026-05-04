@@ -7,15 +7,17 @@ import { OfferStatus } from "@/lib/types/offer"
 
 interface CreateOfferParams {
   orderId: string
+  orderTitle: string
   priceInCent: number
   comment: string
+  providerId: string
 }
 
 export function useOffer() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function createOffer({ orderId, priceInCent, comment }: CreateOfferParams) {
+  async function createOffer({ orderId, orderTitle, priceInCent, comment, providerId }: CreateOfferParams) {
     setLoading(true)
     setError(null)
 
@@ -24,6 +26,9 @@ export function useOffer() {
       await addDoc(collection(db, "orders", orderId, "offers"), {
         priceInCent,
         comment,
+        orderId,
+        orderTitle,
+        providerId,
         status: OfferStatus.pending,
         createdAt: serverTimestamp(),
       })
