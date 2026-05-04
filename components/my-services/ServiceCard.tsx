@@ -5,6 +5,7 @@ import Image from "next/image"
 import { ImageIcon, Pencil, MapPin } from "lucide-react"
 import { Service, ServiceStatus, PricingType } from "@/lib/types/service"
 import { useUpdateServiceStatus } from "@/lib/hooks/useUpdateServiceStatus"
+import ConfirmationModal from "@/components/ConfirmationModal"
 
 const statusStyles: Record<ServiceStatus, string> = {
   [ServiceStatus.active]: "bg-accent/10 text-accent",
@@ -36,6 +37,8 @@ export default function ServiceCard({ service, onEdit }: ServiceCardProps) {
 
   const isDeleted = status === ServiceStatus.deleted
   const isActive = status === ServiceStatus.active
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [toggleConfirmOpen, setToggleConfirmOpen] = useState(false)
 
   async function handleToggleStatus() {
     if (loading) return
@@ -51,6 +54,7 @@ export default function ServiceCard({ service, onEdit }: ServiceCardProps) {
   }
 
   return (
+    <>
     <div
       className={`rounded-2xl border bg-background px-4 py-4 sm:px-6 sm:py-5 transition ${
         isDeleted
@@ -125,7 +129,7 @@ export default function ServiceCard({ service, onEdit }: ServiceCardProps) {
             <button
               type="button"
               disabled={loading}
-              onClick={handleDelete}
+              onClick={() => setDeleteConfirmOpen(true)}
               className="rounded-xl px-4 py-2 text-[13px] font-medium text-text/40 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
             >
               Löschen
@@ -144,7 +148,7 @@ export default function ServiceCard({ service, onEdit }: ServiceCardProps) {
             <button
               type="button"
               disabled={loading}
-              onClick={handleToggleStatus}
+              onClick={() => setToggleConfirmOpen(true)}
               className={`rounded-xl px-4 py-2 text-[13px] font-medium transition disabled:opacity-50 ${
                 isActive
                   ? "bg-secondary text-text/60 hover:bg-secondary/70"
@@ -161,5 +165,32 @@ export default function ServiceCard({ service, onEdit }: ServiceCardProps) {
         )}
       </div>
     </div>
+
+    <ConfirmationModal
+      open={toggleConfirmOpen}
+      title={isActive ? "Service wirklich deaktivieren?" : "Service aktivieren?"}
+      description={isActive ? "Der Service ist danach nicht mehr öffentlich sichtbar." : "Der Service wird wieder öffentlich sichtbar."}
+      confirmLabel={isActive ? "Ja, deaktivieren" : "Ja, aktivieren"}
+      loading={loading}
+      onCancel={() => setToggleConfirmOpen(false)}
+      onConfirm={async () => {
+        await handleToggleStatus()
+        setToggleConfirmOpen(false)
+      }}
+    />
+
+    <ConfirmationModal
+      open={deleteConfirmOpen}
+      title="Service wirklich löschen?"
+      description="Der Service wird als gelöscht markiert und nicht mehr angezeigt."
+      confirmLabel="Ja, löschen"
+      loading={loading}
+      onCancel={() => setDeleteConfirmOpen(false)}
+      onConfirm={async () => {
+        await handleDelete()
+        setDeleteConfirmOpen(false)
+      }}
+    />
+    </>
   )
 }
