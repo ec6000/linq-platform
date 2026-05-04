@@ -2,6 +2,8 @@
 import { initializeApp, cert } from "firebase-admin/app"
 import { getFirestore, Timestamp, GeoPoint } from "firebase-admin/firestore"
 import { readFileSync } from "fs"
+import { JobStatus, JobSourceType } from "@/lib/types/job"
+import { PricingType } from "@/lib/types/service"
 
 // Service Account laden – Pfad anpassen
 const serviceAccount = JSON.parse(
@@ -37,29 +39,24 @@ const daysAgo = (days: number, hours = 0): Timestamp => {
 // ────────────────────────────────────────────────────────────
 // Job-Definitionen: handverlesen, jeder Job individuell
 // ────────────────────────────────────────────────────────────
-type JobStatusSeed = "pending" | "inProgress" | "completed" | "accepted" | "cancelled"
-type JobSourceTypeSeed = "order" | "service"
-type PricingTypeSeed = "Gesamt" | "/ Stunde" | "pro Einheit"
-
 interface JobSeed {
   // Herkunft
-  sourceType: JobSourceTypeSeed
+  sourceType: JobSourceType
 
   // Snapshot
   title: string
   description: string
   categoryId: string
-  pricingType: PricingTypeSeed
+  pricingType: PricingType
   priceInCent: number
   unitName?: string
 
   // Ort & Zeit
   location: { lat: number; lng: number; address: string }
   scheduledInDays: number // negativ = Vergangenheit
-  scheduledDateText: string
 
   // Status
-  status: JobStatusSeed
+  status: JobStatus
   createdDaysAgo: number
 
   // Bewertung (optional, nur bei completed)
@@ -70,185 +67,173 @@ interface JobSeed {
 const jobs: JobSeed[] = [
   // ── Aktive Jobs (pending) ─────────────────────────────────
   {
-    sourceType: "service",
+    sourceType: JobSourceType.service,
     title: "IKEA PAX Kleiderschrank aufbauen (3m)",
     description:
       "PAX mit 3 Elementen, Schiebetüren, komplette Innenausstattung. Ca. 3 Stunden eingeplant.",
     categoryId: "handyman",
-    pricingType: "/ Stunde",
+    pricingType: PricingType.perHour,
     priceInCent: 3500,
     location: { lat: 50.9576, lng: 6.9741, address: "Köln Nippes" },
     scheduledInDays: 3,
-    scheduledDateText: "Donnerstag, 14:00 Uhr",
-    status: "pending",
+    status: JobStatus.pending,
     createdDaysAgo: 2,
   },
   {
-    sourceType: "order",
+    sourceType: JobSourceType.order,
     title: "Wohnungsreinigung nach Auszug (75qm)",
     description:
       "Endreinigung vor Übergabe. Inkl. Fenster, Küche entfetten, Bad, Böden. Material wird gestellt.",
     categoryId: "cleaning",
-    pricingType: "Gesamt",
+    pricingType: PricingType.fixed,
     priceInCent: 22000,
     location: { lat: 50.9189, lng: 6.9581, address: "Köln Bayenthal" },
     scheduledInDays: 2,
-    scheduledDateText: "Mittwoch, 09:00 Uhr",
-    status: "pending",
+    status: JobStatus.pending,
     createdDaysAgo: 1,
   },
   {
-    sourceType: "service",
+    sourceType: JobSourceType.service,
     title: "Mathe-Nachhilfe Klasse 10",
     description:
       "Quadratische Funktionen, Vorbereitung auf Klassenarbeit. 2-3 Sitzungen à 90 Min.",
     categoryId: "other",
-    pricingType: "/ Stunde",
+    pricingType: PricingType.perHour,
     priceInCent: 3000,
     location: { lat: 50.9375, lng: 6.9603, address: "Köln Innenstadt" },
     scheduledInDays: 1,
-    scheduledDateText: "Morgen, 16:00 Uhr",
-    status: "pending",
+    status: JobStatus.pending,
     createdDaysAgo: 2,
   },
 
   // ── Laufende Jobs (inProgress) ────────────────────────────
   {
-    sourceType: "order",
+    sourceType: JobSourceType.order,
     title: "Umzug 2-Zimmer-Wohnung",
     description:
       "Umzug von Sülz nach Ehrenfeld. 3. OG ohne Aufzug, 2 Helfer, Transporter dabei.",
     categoryId: "moving",
-    pricingType: "Gesamt",
+    pricingType: PricingType.fixed,
     priceInCent: 18000,
     location: { lat: 50.9272, lng: 6.9336, address: "Köln Sülz" },
     scheduledInDays: 0,
-    scheduledDateText: "Heute, 09:00 Uhr",
-    status: "inProgress",
+    status: JobStatus.inProgress,
     createdDaysAgo: 4,
   },
   {
-    sourceType: "service",
+    sourceType: JobSourceType.service,
     title: "Hunde-Sitting (Wochenende)",
     description:
       "Golden Retriever, 4 Jahre. 2x täglich Gassi, Füttern, Übernachtung beim Sitter.",
     categoryId: "household",
-    pricingType: "Gesamt",
+    pricingType: PricingType.fixed,
     priceInCent: 15000,
     location: { lat: 50.9413, lng: 6.9583, address: "Köln Altstadt-Nord" },
     scheduledInDays: 0,
-    scheduledDateText: "Fr-So, läuft",
-    status: "inProgress",
+    status: JobStatus.inProgress,
     createdDaysAgo: 6,
   },
   {
-    sourceType: "service",
+    sourceType: JobSourceType.service,
     title: "Pflanzen gießen während Urlaub",
     description:
       "Ca. 20 Zimmerpflanzen + Balkonkästen. 2-3 Besuche pro Woche, Briefkasten leeren.",
     categoryId: "gardening",
-    pricingType: "Gesamt",
+    pricingType: PricingType.fixed,
     priceInCent: 6000,
     location: { lat: 50.9189, lng: 6.9581, address: "Köln Bayenthal" },
     scheduledInDays: 0,
-    scheduledDateText: "15.–29., laufend",
-    status: "inProgress",
+    status: JobStatus.inProgress,
     createdDaysAgo: 9,
   },
 
   // ── Abgeschlossene Jobs (completed) ───────────────────────
   {
-    sourceType: "order",
+    sourceType: JobSourceType.order,
     title: "Hecke schneiden und Rasen mähen",
     description:
       "Reihenhausgarten, Hecke 15m, Rasen 60qm. Häcksler und Mäher vorhanden.",
     categoryId: "gardening",
-    pricingType: "Gesamt",
+    pricingType: PricingType.fixed,
     priceInCent: 8000,
     location: { lat: 50.9089, lng: 6.8756, address: "Köln Rodenkirchen" },
     scheduledInDays: -3,
-    scheduledDateText: "Vor 3 Tagen",
-    status: "completed",
+    status: JobStatus.completed,
     createdDaysAgo: 7,
     customerRating: 5,
     providerRating: 5,
   },
   {
-    sourceType: "service",
+    sourceType: JobSourceType.service,
     title: "Fensterreinigung Einfamilienhaus",
     description:
       "14 Fenster innen und außen, Rahmen mit. Streifenfrei, mit Profi-Equipment.",
     categoryId: "cleaning",
-    pricingType: "pro Einheit",
+    pricingType: PricingType.perUnit,
     priceInCent: 800,
-    unitName: "Einheit",
+    unitName: "Fenster",
     location: { lat: 50.9667, lng: 7.0167, address: "Köln Mülheim" },
     scheduledInDays: -7,
-    scheduledDateText: "Vor 1 Woche",
-    status: "completed",
+    status: JobStatus.completed,
     createdDaysAgo: 10,
     customerRating: 5,
     providerRating: 4,
   },
   {
-    sourceType: "order",
+    sourceType: JobSourceType.order,
     title: "Auto-Innenraum Tiefenreinigung",
     description:
       "BMW 3er, 4 Jahre alt. Saugen, Polster shampoonieren, Armaturen pflegen.",
     categoryId: "automotive",
-    pricingType: "Gesamt",
+    pricingType: PricingType.fixed,
     priceInCent: 11000,
     location: { lat: 50.9511, lng: 7.0089, address: "Köln Deutz" },
     scheduledInDays: -5,
-    scheduledDateText: "Vor 5 Tagen",
-    status: "accepted",
+    status: JobStatus.accepted,
     createdDaysAgo: 12,
     customerRating: 4,
     providerRating: 5,
   },
   {
-    sourceType: "service",
+    sourceType: JobSourceType.service,
     title: "Smartphone-Einrichtung für Senior",
     description:
       "Samsung-Einrichtung: WhatsApp, Fotos, Kontakte. Geduldig erklärt.",
     categoryId: "other",
-    pricingType: "/ Stunde",
+    pricingType: PricingType.perHour,
     priceInCent: 2750,
     location: { lat: 50.9667, lng: 7.0167, address: "Köln Mülheim" },
     scheduledInDays: -10,
-    scheduledDateText: "Vor 10 Tagen",
-    status: "completed",
+    status: JobStatus.completed,
     createdDaysAgo: 14,
     customerRating: 5,
     // providerRating bewusst weggelassen – noch nicht bewertet
   },
   {
-    sourceType: "order",
+    sourceType: JobSourceType.order,
     title: "Silikonfugen Bad erneuern",
     description: "Dusche und Wanne, ca. 6m gesamt. Material vom Kunden.",
     categoryId: "handyman",
-    pricingType: "Gesamt",
+    pricingType: PricingType.fixed,
     priceInCent: 7500,
     location: { lat: 50.9576, lng: 6.9741, address: "Köln Nippes" },
     scheduledInDays: -14,
-    scheduledDateText: "Vor 2 Wochen",
-    status: "completed",
+    status: JobStatus.completed,
     createdDaysAgo: 18,
     customerRating: 4,
     providerRating: 5,
   },
   {
-    sourceType: "service",
+    sourceType: JobSourceType.service,
     title: "Wocheneinkauf für Senior",
     description:
       "Wöchentlicher Einkauf nach Liste, inkl. Lieferung in die Wohnung.",
     categoryId: "household",
-    pricingType: "Gesamt",
+    pricingType: PricingType.fixed,
     priceInCent: 3500,
     location: { lat: 50.9375, lng: 6.9603, address: "Köln Innenstadt" },
     scheduledInDays: -2,
-    scheduledDateText: "Vor 2 Tagen",
-    status: "completed",
+    status: JobStatus.completed,
     createdDaysAgo: 16,
     customerRating: 5,
     providerRating: 5,
@@ -256,46 +241,43 @@ const jobs: JobSeed[] = [
 
   // ── Abgebrochene Jobs (cancelled) ─────────────────────────
   {
-    sourceType: "order",
+    sourceType: JobSourceType.order,
     title: "Waschmaschine in 4. Stock tragen",
     description:
       "Lieferung nur bis Haustür, Treppenhaus eng, kein Aufzug. Anschluss vorhanden.",
     categoryId: "moving",
-    pricingType: "Gesamt",
+    pricingType: PricingType.fixed,
     priceInCent: 10000,
     location: { lat: 50.9089, lng: 6.8756, address: "Köln Rodenkirchen" },
     scheduledInDays: -1,
-    scheduledDateText: "War für gestern geplant",
-    status: "cancelled",
+    status: JobStatus.cancelled,
     createdDaysAgo: 5,
   },
   {
-    sourceType: "service",
+    sourceType: JobSourceType.service,
     title: "Wohnzimmer und Flur streichen",
     description:
       "Ca. 45qm Wandfläche, weiß auf weiß. Decke nicht. Material vom Kunden.",
     categoryId: "handyman",
-    pricingType: "pro Einheit",
+    pricingType: PricingType.perUnit,
     priceInCent: 1200,
-    unitName: "Einheit",
+    unitName: "qm",
     location: { lat: 50.9413, lng: 6.9583, address: "Köln Altstadt-Nord" },
     scheduledInDays: -4,
-    scheduledDateText: "War für letzte Woche",
-    status: "cancelled",
+    status: JobStatus.cancelled,
     createdDaysAgo: 11,
   },
   {
-    sourceType: "order",
+    sourceType: JobSourceType.order,
     title: "Keller entrümpeln",
     description:
       "15qm Kellerraum, Sortieren und Wertstoffhof. Anhänger vorhanden.",
     categoryId: "moving",
-    pricingType: "Gesamt",
+    pricingType: PricingType.fixed,
     priceInCent: 20000,
     location: { lat: 50.9272, lng: 6.9336, address: "Köln Sülz" },
     scheduledInDays: -6,
-    scheduledDateText: "War für vor 6 Tagen",
-    status: "cancelled",
+    status: JobStatus.cancelled,
     createdDaysAgo: 13,
   },
 ]
@@ -322,7 +304,7 @@ async function seedJobs() {
       // Herkunft
       sourceType: j.sourceType,
       sourceId:
-        j.sourceType === "order"
+        j.sourceType === JobSourceType.order
           ? `test-order-${randomInt(1, 15)}`
           : `test-service-${randomInt(1, 15)}`,
 
@@ -335,12 +317,12 @@ async function seedJobs() {
       description: j.description,
       categoryId: j.categoryId,
       pricingType: j.pricingType,
+      priceInCent: j.priceInCent,
 
       // Ort & Zeit
       location: new GeoPoint(j.location.lat, j.location.lng),
       addressText: j.location.address,
       scheduledAt,
-      scheduledDateText: j.scheduledDateText,
 
       // Status
       status: j.status,
@@ -350,36 +332,30 @@ async function seedJobs() {
       updatedAt,
     }
 
-    // Pricing: entweder Festpreis oder Range
-    if (j.priceInCent !== undefined) {
-      jobDoc.priceInCent = j.priceInCent
-    }
-    if (j.minBudgetInCent !== undefined) {
-      jobDoc.minBudgetInCent = j.minBudgetInCent
-    }
-    if (j.maxBudgetInCent !== undefined) {
-      jobDoc.maxBudgetInCent = j.maxBudgetInCent
+    // Optionaler unitName (nur bei perUnit-Pricing)
+    if (j.unitName !== undefined) {
+      jobDoc.unitName = j.unitName
     }
 
     // Source-spezifische Felder
-    if (j.sourceType === "order") {
+    if (j.sourceType === JobSourceType.order) {
       jobDoc.offerId = `test-offer-${randomInt(1000, 9999)}`
     } else {
       jobDoc.bookingId = `test-booking-${randomInt(1000, 9999)}`
     }
 
     // Status-spezifische Zeitstempel
-    if (j.status === "inProgress") {
+    if (j.status === JobStatus.inProgress) {
       jobDoc.startedAt = daysAgo(randomInt(0, 1))
-    } else if (j.status === "completed") {
+    } else if (j.status === JobStatus.completed) {
       // gestartet vor scheduledAt, abgeschlossen kurz danach
       jobDoc.startedAt = daysAgo(Math.abs(j.scheduledInDays))
       jobDoc.completedAt = daysAgo(Math.max(0, Math.abs(j.scheduledInDays) - 1))
-    } else if (j.status === "cancelled") {
+    } else if (j.status === JobStatus.cancelled) {
       jobDoc.cancelledAt = daysAgo(Math.max(0, Math.abs(j.scheduledInDays) - 1))
     }
 
-    // Bewertungen (nur bei completed)
+    // Bewertungen (nur bei completed sinnvoll)
     if (j.customerRating !== undefined) {
       jobDoc.customerRating = j.customerRating
     }
@@ -389,12 +365,9 @@ async function seedJobs() {
 
     batch.set(docRef, jobDoc)
 
-    const priceLabel =
-      j.priceInCent !== undefined
-        ? `${(j.priceInCent / 100).toFixed(0)}€ ${j.pricingType}`
-        : j.minBudgetInCent !== undefined && j.maxBudgetInCent !== undefined
-          ? `${(j.minBudgetInCent / 100).toFixed(0)}–${(j.maxBudgetInCent / 100).toFixed(0)}€ ${j.pricingType}`
-          : "—"
+    const priceLabel = `${(j.priceInCent / 100).toFixed(0)}€ ${j.pricingType}${
+      j.unitName ? ` (${j.unitName})` : ""
+    }`
 
     const ratingLabel =
       j.customerRating || j.providerRating
