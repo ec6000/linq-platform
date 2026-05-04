@@ -21,6 +21,9 @@ export interface Booking {
   requestedDateText?: string
   requestedAt?: Timestamp
 
+  // Antwort Dienstleister
+  declineMessage?: string
+
   // 📍 Ort (kann vom Service abweichen)
   location?: GeoPoint
   addressText?: string
