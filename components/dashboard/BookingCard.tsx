@@ -5,6 +5,7 @@ import { doc, serverTimestamp, updateDoc } from "firebase/firestore"
 import { Booking, BookingStatus } from "@/lib/types/booking"
 import { db } from "@/lib/firebase/firebase"
 import { PricingType } from "@/lib/types/service"
+import ConfirmationModal from "@/components/ConfirmationModal"
 
 interface BookingCardProps {
   booking: Booking
@@ -64,6 +65,7 @@ export default function BookingCard({ booking }: BookingCardProps) {
   const [status, setStatus] = useState(booking.status)
   const [declineMessage, setDeclineMessage] = useState(booking.declineMessage ?? "")
   const [confirmDeclineOpen, setConfirmDeclineOpen] = useState(false)
+  const [confirmAcceptOpen, setConfirmAcceptOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -173,7 +175,7 @@ export default function BookingCard({ booking }: BookingCardProps) {
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={handleAccept}
+              onClick={() => setConfirmAcceptOpen(true)}
               disabled={saving}
               className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -192,6 +194,19 @@ export default function BookingCard({ booking }: BookingCardProps) {
 
         {actionError && <p className="mt-3 text-sm text-red-500">{actionError}</p>}
       </article>
+
+      <ConfirmationModal
+        open={confirmAcceptOpen}
+        title="Booking wirklich annehmen?"
+        description="Der Status wird auf Angenommen gesetzt."
+        confirmLabel="Ja, annehmen"
+        loading={saving}
+        onCancel={() => setConfirmAcceptOpen(false)}
+        onConfirm={async () => {
+          await handleAccept()
+          setConfirmAcceptOpen(false)
+        }}
+      />
 
       {confirmDeclineOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-text/35 px-4">

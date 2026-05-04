@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import { ArrowLeft, CalendarDays, CircleDollarSign, MapPin, UserRound } from "lucide-react"
 import OfferModal from "@/components/find-jobs/OfferModal"
+import ConfirmationModal from "@/components/ConfirmationModal"
 import { useCategories } from "@/lib/hooks/useCategory"
 import { useMyOffer } from "@/lib/hooks/useMyOffer"
 import { useOrders } from "@/lib/hooks/useOrders"
@@ -55,6 +56,7 @@ export default function DetailedOrderPage() {
   const { orders, loading, error } = useOrders()
   const { categories } = useCategories()
   const [modalOpen, setModalOpen] = useState(false)
+  const [withdrawConfirmOpen, setWithdrawConfirmOpen] = useState(false)
 
   const order = useMemo(() => orders.find((item) => item.id === orderId), [orders, orderId])
   const { offer, deleting, withdrawOffer } = useMyOffer(orderId)
@@ -220,7 +222,7 @@ export default function DetailedOrderPage() {
             <button
               type="button"
               disabled={deleting}
-              onClick={withdrawOffer}
+              onClick={() => setWithdrawConfirmOpen(true)}
               className="rounded-xl border border-red-200 px-4 py-2 text-[13px] font-medium text-red-400 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
             >
               {deleting ? "…" : "Angebot zurückziehen"}
@@ -228,6 +230,19 @@ export default function DetailedOrderPage() {
           )}
         </div>
       </section>
+
+      <ConfirmationModal
+        open={withdrawConfirmOpen}
+        title="Angebot wirklich zurückziehen?"
+        description="Danach ist dein Preisangebot für diesen Auftrag nicht mehr aktiv."
+        confirmLabel="Ja, zurückziehen"
+        loading={deleting}
+        onCancel={() => setWithdrawConfirmOpen(false)}
+        onConfirm={async () => {
+          await withdrawOffer()
+          setWithdrawConfirmOpen(false)
+        }}
+      />
 
       <OfferModal
         orderId={order.id}

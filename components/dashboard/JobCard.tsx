@@ -74,6 +74,7 @@ export default function JobCard({ job, categoryName, subcategoryName }: JobCardP
   const [status, setStatus] = useState<JobStatus>(job.status)
   const { updateJobStatus, loading, error } = useUpdateJobStatus()
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
+  const [advanceConfirmOpen, setAdvanceConfirmOpen] = useState(false)
 
   const nextStatus = getNextStatus(status)
   const canCancel = status === JobStatus.pending || status === JobStatus.inProgress
@@ -177,7 +178,7 @@ export default function JobCard({ job, categoryName, subcategoryName }: JobCardP
             <button
               type="button"
               disabled={loading}
-              onClick={handleAdvanceStatus}
+              onClick={() => setAdvanceConfirmOpen(true)}
               className="rounded-xl bg-primary px-4 py-2 text-[13px] font-medium text-white transition hover:bg-primary/90 disabled:opacity-50"
             >
               {loading ? "…" : status === JobStatus.pending ? "Starten" : "Abschließen"}
@@ -186,6 +187,18 @@ export default function JobCard({ job, categoryName, subcategoryName }: JobCardP
         </div>
       )}
       </article>
+      <ConfirmationModal
+      open={advanceConfirmOpen}
+      title={status === JobStatus.pending ? "Job wirklich starten?" : "Job wirklich abschließen?"}
+      description={status === JobStatus.pending ? "Der Job wechselt in den Status In Bearbeitung." : "Der Job wird als abgeschlossen markiert."}
+      confirmLabel={status === JobStatus.pending ? "Ja, starten" : "Ja, abschließen"}
+      loading={loading}
+      onCancel={() => setAdvanceConfirmOpen(false)}
+      onConfirm={async () => {
+        await handleAdvanceStatus()
+        setAdvanceConfirmOpen(false)
+      }}
+      />
       <ConfirmationModal
       open={cancelConfirmOpen}
       title="Job wirklich stornieren?"
