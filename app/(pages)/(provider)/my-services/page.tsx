@@ -114,7 +114,7 @@ export default function ServicesPage() {
         <button
           type="button"
           onClick={openCreateForm}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
+          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
         >
           <Plus size={16} strokeWidth={2} />
           Service erstellen
