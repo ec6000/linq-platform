@@ -105,8 +105,8 @@ export default function ServicesPage() {
 
   return (
     <main className="mx-auto max-w-[1600px] px-6 py-10">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
+        <div className="flex h-10 items-center gap-3">
           <Layers size={22} className="text-primary" strokeWidth={1.8} />
           <h1 className="text-[22px] font-semibold tracking-tight text-text">Meine Services</h1>
         </div>
@@ -114,7 +114,7 @@ export default function ServicesPage() {
         <button
           type="button"
           onClick={openCreateForm}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+          className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition hover:opacity-90"
         >
           <Plus size={16} strokeWidth={2} />
           Service erstellen
