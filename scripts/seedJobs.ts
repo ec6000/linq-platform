@@ -37,7 +37,7 @@ const daysAgo = (days: number, hours = 0): Timestamp => {
 // ────────────────────────────────────────────────────────────
 // Job-Definitionen: handverlesen, jeder Job individuell
 // ────────────────────────────────────────────────────────────
-type JobStatusSeed = "pending" | "inProgress" | "completed" | "cancelled"
+type JobStatusSeed = "pending" | "inProgress" | "completed" | "accepted" | "cancelled"
 type JobSourceTypeSeed = "order" | "service"
 type PricingTypeSeed = "Gesamt" | "/ Stunde" | "pro Einheit"
 
@@ -50,9 +50,8 @@ interface JobSeed {
   description: string
   categoryId: string
   pricingType: PricingTypeSeed
-  priceInCent?: number
-  minBudgetInCent?: number
-  maxBudgetInCent?: number
+  priceInCent: number
+  unitName?: string
 
   // Ort & Zeit
   location: { lat: number; lng: number; address: string }
@@ -77,8 +76,7 @@ const jobs: JobSeed[] = [
       "PAX mit 3 Elementen, Schiebetüren, komplette Innenausstattung. Ca. 3 Stunden eingeplant.",
     categoryId: "handyman",
     pricingType: "/ Stunde",
-    minBudgetInCent: 3000,
-    maxBudgetInCent: 4000,
+    priceInCent: 3500,
     location: { lat: 50.9576, lng: 6.9741, address: "Köln Nippes" },
     scheduledInDays: 3,
     scheduledDateText: "Donnerstag, 14:00 Uhr",
@@ -106,8 +104,7 @@ const jobs: JobSeed[] = [
       "Quadratische Funktionen, Vorbereitung auf Klassenarbeit. 2-3 Sitzungen à 90 Min.",
     categoryId: "other",
     pricingType: "/ Stunde",
-    minBudgetInCent: 2500,
-    maxBudgetInCent: 3500,
+    priceInCent: 3000,
     location: { lat: 50.9375, lng: 6.9603, address: "Köln Innenstadt" },
     scheduledInDays: 1,
     scheduledDateText: "Morgen, 16:00 Uhr",
@@ -184,6 +181,7 @@ const jobs: JobSeed[] = [
     categoryId: "cleaning",
     pricingType: "pro Einheit",
     priceInCent: 800,
+    unitName: "Einheit",
     location: { lat: 50.9667, lng: 7.0167, address: "Köln Mülheim" },
     scheduledInDays: -7,
     scheduledDateText: "Vor 1 Woche",
@@ -203,7 +201,7 @@ const jobs: JobSeed[] = [
     location: { lat: 50.9511, lng: 7.0089, address: "Köln Deutz" },
     scheduledInDays: -5,
     scheduledDateText: "Vor 5 Tagen",
-    status: "completed",
+    status: "accepted",
     createdDaysAgo: 12,
     customerRating: 4,
     providerRating: 5,
@@ -215,8 +213,7 @@ const jobs: JobSeed[] = [
       "Samsung-Einrichtung: WhatsApp, Fotos, Kontakte. Geduldig erklärt.",
     categoryId: "other",
     pricingType: "/ Stunde",
-    minBudgetInCent: 2500,
-    maxBudgetInCent: 3000,
+    priceInCent: 2750,
     location: { lat: 50.9667, lng: 7.0167, address: "Köln Mülheim" },
     scheduledInDays: -10,
     scheduledDateText: "Vor 10 Tagen",
@@ -280,6 +277,7 @@ const jobs: JobSeed[] = [
     categoryId: "handyman",
     pricingType: "pro Einheit",
     priceInCent: 1200,
+    unitName: "Einheit",
     location: { lat: 50.9413, lng: 6.9583, address: "Köln Altstadt-Nord" },
     scheduledInDays: -4,
     scheduledDateText: "War für letzte Woche",

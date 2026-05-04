@@ -4,11 +4,13 @@ import { useState } from "react"
 import { Job, JobSourceType, JobStatus } from "@/lib/types/job"
 import { PricingType } from "@/lib/types/service"
 import { useUpdateJobStatus } from "@/lib/hooks/useChangeJobStatus"
+import ConfirmationModal from "@/components/ConfirmationModal"
 
 const statusStyles: Record<JobStatus, string> = {
   [JobStatus.pending]: "bg-accent/10 text-accent",
   [JobStatus.inProgress]: "bg-primary/10 text-primary",
   [JobStatus.completed]: "bg-secondary text-text/60",
+  [JobStatus.accepted]: "bg-primary/10 text-primary",
   [JobStatus.cancelled]: "bg-secondary text-text/40",
 }
 
@@ -16,6 +18,7 @@ const statusLabel: Record<JobStatus, string> = {
   [JobStatus.pending]: "Ausstehend",
   [JobStatus.inProgress]: "In Bearbeitung",
   [JobStatus.completed]: "Abgeschlossen",
+  [JobStatus.accepted]: "Bestätigt",
   [JobStatus.cancelled]: "Storniert",
 }
 
@@ -36,13 +39,13 @@ interface JobCardProps {
   subcategoryName?: string
 }
 
-function formatPrice(valueInCent: number | undefined, pricingType: PricingType) {
-  if (valueInCent === undefined) return "Preis auf Anfrage"
+function formatPrice(valueInCent: number, pricingType: PricingType, unitName?: string) {
   const value = (valueInCent / 100).toLocaleString("de-DE", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
-  return `${value} €${pricingSuffix[pricingType]}`
+  const suffix = pricingType === PricingType.perUnit && unitName ? ` / ${unitName}` : pricingSuffix[pricingType]
+  return `${value} €${suffix}`
 }
 
 function formatScheduledAt(value?: { toDate: () => Date }) {
@@ -70,6 +73,7 @@ function getNextStatus(status: JobStatus) {
 export default function JobCard({ job, categoryName, subcategoryName }: JobCardProps) {
   const [status, setStatus] = useState<JobStatus>(job.status)
   const { updateJobStatus, loading, error } = useUpdateJobStatus()
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
 
   const nextStatus = getNextStatus(status)
   const canCancel = status === JobStatus.pending || status === JobStatus.inProgress
@@ -85,10 +89,12 @@ export default function JobCard({ job, categoryName, subcategoryName }: JobCardP
     if (!canCancel || loading) return
     await updateJobStatus(job.id, JobStatus.cancelled)
     if (!error) setStatus(JobStatus.cancelled)
+    setCancelConfirmOpen(false)
   }
 
   return (
-    <article className="rounded-2xl border border-secondary bg-background p-6 transition hover:border-primary/30 hover:shadow-sm">
+    <>
+      <article className="rounded-2xl border border-secondary bg-background p-6 transition hover:border-primary/30 hover:shadow-sm">
       {/* Header: Meta-Pills + Status */}
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-[12px] text-text/55">
@@ -124,7 +130,7 @@ export default function JobCard({ job, categoryName, subcategoryName }: JobCardP
 
       {/* Preis prominent */}
       <div className="mt-5 text-[20px] font-semibold tracking-tight text-text">
-        {formatPrice(job.priceInCent, job.pricingType)}
+        {formatPrice(job.priceInCent, job.pricingType, job.unitName)}
       </div>
 
       {/* Sekundär-Infos: Termin & Adresse */}
@@ -160,7 +166,7 @@ export default function JobCard({ job, categoryName, subcategoryName }: JobCardP
             <button
               type="button"
               disabled={loading}
-              onClick={handleCancel}
+              onClick={() => setCancelConfirmOpen(true)}
               className="rounded-xl px-4 py-2 text-[13px] font-medium text-text/50 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
             >
               Stornieren
@@ -179,6 +185,16 @@ export default function JobCard({ job, categoryName, subcategoryName }: JobCardP
           )}
         </div>
       )}
-    </article>
+      </article>
+      <ConfirmationModal
+      open={cancelConfirmOpen}
+      title="Job wirklich stornieren?"
+      description="Du kannst den Status danach nicht automatisch zurücksetzen."
+      confirmLabel="Ja, stornieren"
+      loading={loading}
+      onCancel={() => setCancelConfirmOpen(false)}
+      onConfirm={handleCancel}
+      />
+    </>
   )
 }

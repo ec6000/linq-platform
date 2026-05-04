@@ -20,7 +20,8 @@ export interface Job {
   categoryId: string
   subcategoryId?: string
   pricingType: PricingType
-  priceInCent?: number
+  priceInCent: number
+  unitName?: string
 
   // Ort & Zeit
   location?: GeoPoint
@@ -52,5 +53,6 @@ export enum JobStatus {
   pending = "pending",
   inProgress = "inProgress",
   completed = "completed",
+  accepted = "accepted",
   cancelled = "cancelled",
 }

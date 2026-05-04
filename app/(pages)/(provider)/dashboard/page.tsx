@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import Link from "next/link"
 import { Briefcase, CalendarClock, HandCoins } from "lucide-react"
 import { useJobs } from "@/lib/hooks/useJobs"
 import { useBookings } from "@/lib/hooks/useBookings"
@@ -11,9 +10,10 @@ import BookingCard from "@/components/dashboard/BookingCard"
 import { JobStatus } from "@/lib/types/job"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useProviderOffers } from "@/lib/hooks/useProviderOffers"
+import OfferCard from "@/components/dashboard/OfferCard"
 
 type DashboardTab = "jobs" | "offers" | "bookings"
-type JobFilter = "all" | JobStatus.pending | JobStatus.inProgress | JobStatus.completed | JobStatus.cancelled
+type JobFilter = "all" | JobStatus.pending | JobStatus.inProgress | JobStatus.completed | JobStatus.accepted | JobStatus.cancelled
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<DashboardTab>("jobs")
@@ -59,7 +59,7 @@ export default function Dashboard() {
 
       {activeTab === "jobs" && <section className="flex flex-col gap-3">{/* same */}
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          {([{ key: "all", label: "Alle" }, { key: JobStatus.pending, label: "Ausstehend" }, { key: JobStatus.inProgress, label: "In Arbeit" }, { key: JobStatus.completed, label: "Abgeschlossen" }, { key: JobStatus.cancelled, label: "Storniert" }] as const).map((chip) => {
+          {([{ key: "all", label: "Alle" }, { key: JobStatus.pending, label: "Ausstehend" }, { key: JobStatus.inProgress, label: "In Arbeit" }, { key: JobStatus.completed, label: "Abgeschlossen" }, { key: JobStatus.accepted, label: "Bestätigt" }, { key: JobStatus.cancelled, label: "Storniert" }] as const).map((chip) => {
             const selected = activeJobFilter === chip.key
             return <button key={chip.key} type="button" onClick={() => setActiveJobFilter(chip.key)} className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${selected ? "border-primary/30 bg-primary/10 text-primary" : "border-secondary text-text/65 hover:bg-secondary"}`}>{chip.label}</button>
           })}
@@ -74,17 +74,7 @@ export default function Dashboard() {
         {offersLoading && <p className="text-sm text-text/40">Preisangebote werden geladen…</p>}
         {offersError && <p className="text-sm text-red-500">{offersError}</p>}
         {!offersLoading && !offersError && offers.length === 0 && <p className="text-sm text-text/40">Noch keine Preisangebote gesendet.</p>}
-        {offers.map((offer) => <article key={`${offer.orderId}-${offer.id}`} className="rounded-2xl border border-secondary bg-background p-4">
-          <div className="mb-2 flex items-start justify-between gap-3">
-            <h2 className="text-[15px] font-semibold text-text">{offer.orderTitle || "Auftrag"}</h2>
-            <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary">{(offer.priceInCent / 100).toLocaleString("de-DE")}€</span>
-          </div>
-          {offer.comment && <p className="mb-3 line-clamp-2 text-[13px] text-text/70">{offer.comment}</p>}
-          <div className="flex items-center justify-between text-[12px] text-text/55">
-            <span>Status: {offer.status}</span>
-            <Link href={`/find-jobs/${offer.orderId}`} className="font-medium text-primary hover:underline">Zum Auftrag</Link>
-          </div>
-        </article>)}
+        {offers.map((offer) => <OfferCard key={`${offer.orderId}-${offer.id}`} offer={offer} />)}
       </section>}
 
       {activeTab === "bookings" && <section className="flex flex-col gap-3">
