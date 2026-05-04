@@ -6,6 +6,10 @@
   --primary: #1E3A5F;
   --secondary: #d3d7df;
   --accent: #38BDF8;
+
+  /* neu */
+  --warning: #F59E0B;
+  --error: #EF4444;
 }
 
 @theme inline {

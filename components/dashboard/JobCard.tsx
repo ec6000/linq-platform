@@ -7,14 +7,16 @@ import { useUpdateJobStatus } from "@/lib/hooks/useChangeJobStatus"
 import ConfirmationModal from "@/components/ConfirmationModal"
 
 const statusStyles: Record<JobStatus, string> = {
-  [JobStatus.pending]: "bg-accent/10 text-accent",
+  [JobStatus.open]: "bg-accent/10 text-accent",
+  [JobStatus.pending]: "bg-accent/10 text-warning",
   [JobStatus.inProgress]: "bg-primary/10 text-primary",
   [JobStatus.completed]: "bg-secondary text-text/60",
   [JobStatus.accepted]: "bg-primary/10 text-primary",
-  [JobStatus.cancelled]: "bg-secondary text-text/40",
+  [JobStatus.cancelled]: "bg-secondary text-error/40",
 }
 
 const statusLabel: Record<JobStatus, string> = {
+  [JobStatus.open]: "Offen",
   [JobStatus.pending]: "Ausstehend",
   [JobStatus.inProgress]: "In Bearbeitung",
   [JobStatus.completed]: "Abgeschlossen",

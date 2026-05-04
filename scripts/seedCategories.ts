@@ -1,29 +1,3 @@
-/**
- * Seed-Script für Firestore: Kategorien & Subkategorien
- *
- * Ausführen mit:
- *   npx tsx scripts/seed-categories.ts
- *
- * Struktur:
- *   categories/{categoryId}
- *     - nameDE: string
- *     - nameEN: string
- *     - slug: string
- *     - order: number
- *     - isActive: boolean
- *     - createdAt: Timestamp
- *     - updatedAt: Timestamp
- *
- *   categories/{categoryId}/subcategories/{subcategoryId}
- *     - nameDE: string
- *     - slug: string
- *     - categoryId: string   (Rückreferenz für Collection-Group-Queries)
- *     - order: number
- *     - isActive: boolean
- *     - createdAt: Timestamp
- *     - updatedAt: Timestamp
- */
-
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import * as path from 'path';
