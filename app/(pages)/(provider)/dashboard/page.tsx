@@ -21,7 +21,7 @@ export default function Dashboard() {
   const { user } = useAuth()
   const { jobs, loading: jobsLoading, error: jobsError } = useJobs()
   const { bookings, loading: bookingsLoading, error: bookingsError } = useBookings()
-  const { offers, loading: offersLoading, error: offersError } = useProviderOffers(user?.uid)
+  const { offers, loading: offersLoading, error: offersError } = useProviderOffers(user?.numericId)
   const { categories } = useCategories()
 
   const categoryLookup = useMemo(() => {

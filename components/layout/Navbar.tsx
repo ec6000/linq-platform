@@ -36,6 +36,7 @@ const providerNavItems = [
 
 const customerNavItems = [
   { label: "Dashboard", href: "/customer-dashboard", icon: LayoutDashboard },
+  { label: "Service finden", href: "/service-finden", icon: Search },
 ];
 
 export default function Navbar({ userRole = "provider", userName = "E" }: NavbarProps) {

@@ -281,11 +281,13 @@ async function seedServices() {
   const servicesRef = db.collection("services")
 
   for (const [i, s] of services.entries()) {
-    const docRef = servicesRef.doc()
+    const id = i + 1
+    const docRef = servicesRef.doc(String(id))
     const now = Timestamp.now()
 
     const serviceDoc: Record<string, unknown> = {
-      providerId: `test-provider-${randomInt(1, 5)}`,
+      id,
+      providerId: randomInt(1, 5),
       providerName: s.providerName,
       title: s.title,
       description: s.description,
@@ -316,6 +318,8 @@ async function seedServices() {
         `\n      [${s.categoryId}] · ${s.location.city} · ${priceLabel} · ${s.status}`
     )
   }
+
+  batch.set(servicesRef.doc("counter"), { count: services.length }, { merge: true })
 
   await batch.commit()
   console.log(

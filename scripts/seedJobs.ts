@@ -292,7 +292,8 @@ async function seedJobs() {
   const jobsRef = db.collection("jobs")
 
   for (const [i, j] of jobs.entries()) {
-    const docRef = jobsRef.doc()
+    const id = i + 1
+    const docRef = jobsRef.doc(String(id))
     const createdAt = daysAgo(j.createdDaysAgo)
     const updatedAt = Timestamp.now()
     const scheduledAt =
@@ -302,15 +303,16 @@ async function seedJobs() {
 
     const jobDoc: Record<string, unknown> = {
       // Herkunft
+      id,
       sourceType: j.sourceType,
       sourceId:
         j.sourceType === JobSourceType.order
-          ? `test-order-${randomInt(1, 15)}`
-          : `test-service-${randomInt(1, 15)}`,
+          ? randomInt(1, 15)
+          : randomInt(1, 15),
 
       // Beteiligte
-      customerId: `test-customer-${randomInt(1, 8)}`,
-      providerId: `test-provider-${randomInt(1, 5)}`,
+      customerId: randomInt(1, 8),
+      providerId: randomInt(1, 5),
 
       // Snapshot
       title: j.title,
@@ -339,9 +341,9 @@ async function seedJobs() {
 
     // Source-spezifische Felder
     if (j.sourceType === JobSourceType.order) {
-      jobDoc.offerId = `test-offer-${randomInt(1000, 9999)}`
+      jobDoc.offerId = randomInt(1, 20)
     } else {
-      jobDoc.bookingId = `test-booking-${randomInt(1000, 9999)}`
+      jobDoc.bookingId = randomInt(1, 20)
     }
 
     // Status-spezifische Zeitstempel
@@ -379,6 +381,8 @@ async function seedJobs() {
         `\n      [${j.sourceType}/${j.categoryId}] · ${j.location.address} · ${priceLabel} · ${j.status}${ratingLabel}`
     )
   }
+
+  batch.set(jobsRef.doc("counter"), { count: jobs.length }, { merge: true })
 
   await batch.commit()
   console.log(`\n✅ Fertig! ${jobs.length} Jobs in Firestore geschrieben.`)

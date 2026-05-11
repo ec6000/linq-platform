@@ -344,14 +344,16 @@ async function seedOrders() {
   const ordersRef = db.collection("orders")
 
   for (const [i, o] of orders.entries()) {
-    const docRef = ordersRef.doc()
+    const id = i + 1
+    const docRef = ordersRef.doc(String(id))
     const now = Timestamp.now()
 
     const orderDoc = {
+      id,
       title: o.title,
       description: o.description,
       customerName: o.customerName,
-      customerId: `test-customer-${randomInt(1, 8)}`,
+      customerId: randomInt(1, 8),
       status: o.status,
       priority: o.priority,
       timeWindow: {
@@ -368,7 +370,7 @@ async function seedOrders() {
       imageUrls: o.imageUrls,
       thumbnailUrl: o.imageUrls[0] ?? null,
       assignedProviderId:
-        o.status === "assigned" ? `test-provider-${randomInt(1, 5)}` : null,
+        o.status === "assigned" ? randomInt(1, 5) : null,
       assignedAt: o.status === "assigned" ? now : null,
       createdAt: now,
       updatedAt: now,
@@ -380,6 +382,8 @@ async function seedOrders() {
         `\n      [${o.categoryId}/${o.subcategoryId}] · ${o.location.address} · ${(o.budgetInCent / 100).toFixed(0)}€ · ${o.status}`
     )
   }
+
+  batch.set(ordersRef.doc("counter"), { count: orders.length }, { merge: true })
 
   await batch.commit()
   console.log(`\n✅ Fertig! ${orders.length} Orders in Firestore geschrieben.`)

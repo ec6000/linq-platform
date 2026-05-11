@@ -256,7 +256,7 @@ function HeroVisual() {
           className="mt-2 text-[12px] leading-snug"
           style={{ color: "var(--text)", opacity: 0.65 }}
         >
-          „Termin direkt bestätigt. Alles top geklappt."
+          „Termin direkt bestätigt. Alles top geklappt.&quot;
         </p>
       </div>
     </div>

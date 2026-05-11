@@ -15,10 +15,18 @@ export function useOrders() {
       try {
         const snapshot = await getDocs(collection(db, "orders"))
 
-        const data: Order[] = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as Omit<Order, "id">),
-        }))
+        const data: Order[] = snapshot.docs
+          .filter((doc) => doc.id !== "counter")
+          .map((doc) => {
+            const raw = doc.data() as Omit<Order, "id" | "firestoreId"> & { id?: number }
+            const numericId = typeof raw.id === "number" ? raw.id : Number(doc.id)
+
+            return {
+              ...raw,
+              id: numericId,
+              firestoreId: doc.id,
+            }
+          })
 
         setOrders(data)
       } catch (err) {

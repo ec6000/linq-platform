@@ -9,12 +9,12 @@ export function useUpdateOrderStatus() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function updateOrderStatus(orderId: string, status: OrderStatus) {
+  async function updateOrderStatus(orderId: number, status: OrderStatus) {
     setLoading(true)
     setError(null)
 
     try {
-      const orderRef = doc(db, "orders", orderId)
+      const orderRef = doc(db, "orders", String(orderId))
 
       await updateDoc(orderRef, {
         status,
