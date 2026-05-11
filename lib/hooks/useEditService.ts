@@ -17,6 +17,8 @@ export interface EditServiceInput {
   city?: string
   categoryId: string
   categoryName?: string
+  subcategoryId?: string
+  subcategoryName?: string
 }
 
 export async function editService(serviceId: number, input: EditServiceInput) {

@@ -24,6 +24,8 @@ export interface Service {
 
   categoryId: string
   categoryName?: string
+  subcategoryId?: string
+  subcategoryName?: string
   bookingIds?: number[]
 
   createdAt: Timestamp

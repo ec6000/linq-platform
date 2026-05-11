@@ -20,6 +20,8 @@ export interface CreateServiceInput {
   city?: string
   categoryId: string
   categoryName?: string
+  subcategoryId?: string
+  subcategoryName?: string
 }
 
 export async function createService(input: CreateServiceInput) {
