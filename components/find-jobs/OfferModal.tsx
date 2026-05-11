@@ -6,7 +6,7 @@ import { useOffer } from "@/lib/hooks/useOffers"
 import { useAuth } from "@/components/auth/AuthProvider"
 
 interface OfferModalProps {
-  orderId: string
+  orderId: number
   orderTitle: string
   isOpen: boolean
   onClose: () => void
@@ -31,9 +31,13 @@ export default function OfferModal({
     if (isOpen) {
       setTimeout(() => priceRef.current?.focus(), 50)
     } else {
-      setPriceInput("")
-      setComment("")
-      setSubmitted(false)
+      const resetTimer = window.setTimeout(() => {
+        setPriceInput("")
+        setComment("")
+        setSubmitted(false)
+      }, 0)
+
+      return () => window.clearTimeout(resetTimer)
     }
   }, [isOpen])
 
@@ -54,8 +58,8 @@ export default function OfferModal({
   async function handleSubmit() {
     if (!isValid || loading) return
     try {
-      if (!user) return
-      await createOffer({ orderId, orderTitle, priceInCent, comment: comment.trim(), providerId: user.uid })
+      if (!user?.numericId) return
+      await createOffer({ orderId, orderTitle, priceInCent, comment: comment.trim(), providerId: user.numericId })
       setSubmitted(true)
       setTimeout(() => {
         onSuccess?.()

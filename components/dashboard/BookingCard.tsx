@@ -81,7 +81,7 @@ export default function BookingCard({ booking }: BookingCardProps) {
     setActionError(null)
 
     try {
-      await updateDoc(doc(db, "bookings", booking.id), {
+      await updateDoc(doc(db, "bookings", String(booking.id)), {
         status: BookingStatus.accepted,
         acceptedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -100,7 +100,7 @@ export default function BookingCard({ booking }: BookingCardProps) {
     setActionError(null)
 
     try {
-      await updateDoc(doc(db, "bookings", booking.id), {
+      await updateDoc(doc(db, "bookings", String(booking.id)), {
         status: BookingStatus.declined,
         declineMessage: declineMessage.trim() || null,
         declinedAt: serverTimestamp(),
