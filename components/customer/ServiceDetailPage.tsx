@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { ArrowLeft, BadgeCheck, CalendarClock, CheckCircle2, Loader2, MapPin, MessageSquare, ShieldCheck, Star } from "lucide-react"
+import { ArrowLeft, BadgeCheck, CalendarClock, CheckCircle2, Euro, Loader2, MapPin, MessageSquare, ShieldCheck, Star } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createBooking } from "@/lib/hooks/useCreateBooking"
 import { useCategories } from "@/lib/hooks/useCategory"
@@ -19,7 +19,7 @@ function formatBudget(minBudgetInCent: number, maxBudgetInCent: number, pricingT
   const max = (maxBudgetInCent / 100).toLocaleString("de-DE", { maximumFractionDigits: 0 })
   const suffix = pricingType === PricingType.perHour ? " / Std." : pricingType === PricingType.perUnit && unitName ? ` / ${unitName}` : ""
 
-  return `${min}–${max} €${suffix}`
+  return `${min}-${max} €${suffix}`
 }
 
 export default function ServiceDetailPage({ serviceId }: ServiceDetailPageProps) {
@@ -29,6 +29,7 @@ export default function ServiceDetailPage({ serviceId }: ServiceDetailPageProps)
   const [message, setMessage] = useState("")
   const [requestedDateText, setRequestedDateText] = useState("")
   const [addressText, setAddressText] = useState("")
+  const [priceInput, setPriceInput] = useState("")
   const [saving, setSaving] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [createdBookingId, setCreatedBookingId] = useState<number | null>(null)
@@ -48,6 +49,15 @@ export default function ServiceDetailPage({ serviceId }: ServiceDetailPageProps)
       return
     }
 
+    const proposedPriceInCent = priceInput.trim()
+      ? Math.round(Number(priceInput.replace(",", ".")) * 100)
+      : undefined
+
+    if (proposedPriceInCent !== undefined && (!Number.isFinite(proposedPriceInCent) || proposedPriceInCent <= 0)) {
+      setSubmitError("Bitte gib einen gültigen Preisvorschlag ein oder lasse das Feld leer.")
+      return
+    }
+
     setSaving(true)
     setSubmitError(null)
 
@@ -59,7 +69,7 @@ export default function ServiceDetailPage({ serviceId }: ServiceDetailPageProps)
         serviceTitle: service.title,
         categoryId: service.categoryId,
         pricingType: service.pricingType,
-        priceInCent: service.minBudgetInCent,
+        priceInCent: proposedPriceInCent,
         unitName: service.unitName,
         message,
         requestedDateText,
@@ -70,6 +80,7 @@ export default function ServiceDetailPage({ serviceId }: ServiceDetailPageProps)
       setMessage("")
       setRequestedDateText("")
       setAddressText("")
+      setPriceInput("")
     } catch (err) {
       console.error(err)
       setSubmitError("Anfrage konnte nicht gesendet werden. Bitte versuche es erneut.")
@@ -88,7 +99,7 @@ export default function ServiceDetailPage({ serviceId }: ServiceDetailPageProps)
 
   return (
     <main className="mx-auto max-w-[1400px] px-6 py-8 md:px-10">
-      <Link href="/find-services" className="mb-5 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-text/60 transition hover:bg-secondary hover:text-text"><ArrowLeft size={16} /> Zurück zur Suche</Link>
+      <Link href="/find-services" className="fixed left-4 top-20 z-30 inline-flex items-center gap-2 rounded-full border border-secondary bg-background/95 px-4 py-2 text-sm font-medium text-text/70 shadow-sm backdrop-blur transition hover:bg-secondary hover:text-text md:left-8"><ArrowLeft size={16} /> Zurück</Link>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
         <section className="overflow-hidden rounded-[2rem] border border-secondary bg-background">
@@ -132,6 +143,9 @@ export default function ServiceDetailPage({ serviceId }: ServiceDetailPageProps)
 
             <label className="mt-4 block text-sm font-medium text-text/75">Adresse / Einsatzort</label>
             <div className="relative mt-2"><MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-text/35" size={17} /><input value={addressText} onChange={(event) => setAddressText(event.target.value)} placeholder={service.city || "Wo soll der Service stattfinden?"} className="h-12 w-full rounded-2xl border border-secondary bg-background pl-11 pr-4 text-sm outline-none focus:border-primary/40" /></div>
+
+            <label className="mt-4 block text-sm font-medium text-text/75">Dein Preisvorschlag (€)</label>
+            <div className="relative mt-2"><Euro className="absolute left-4 top-1/2 -translate-y-1/2 text-text/35" size={17} /><input value={priceInput} onChange={(event) => setPriceInput(event.target.value)} inputMode="decimal" placeholder={`Optional, z.B. ${(service.minBudgetInCent / 100).toLocaleString("de-DE")}`} className="h-12 w-full rounded-2xl border border-secondary bg-background pl-11 pr-4 text-sm outline-none focus:border-primary/40" /></div>
 
             <label className="mt-4 block text-sm font-medium text-text/75">Nachricht</label>
             <div className="relative mt-2"><MessageSquare className="absolute left-4 top-4 text-text/35" size={17} /><textarea value={message} onChange={(event) => setMessage(event.target.value)} required rows={5} placeholder="Beschreibe kurz, was du brauchst…" className="w-full resize-none rounded-2xl border border-secondary bg-background py-3 pl-11 pr-4 text-sm leading-6 outline-none focus:border-primary/40" /></div>

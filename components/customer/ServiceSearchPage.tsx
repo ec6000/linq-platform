@@ -49,7 +49,13 @@ function formatBudget(service: Service) {
   const min = (service.minBudgetInCent / 100).toLocaleString("de-DE")
   const max = (service.maxBudgetInCent / 100).toLocaleString("de-DE")
 
-  return `${min}–${max} €`
+  return `${min}-${max} €`
+}
+
+function formatPricingLabel(service: Service) {
+  if (service.pricingType === PricingType.perHour) return "/ Stunde"
+  if (service.pricingType === PricingType.perUnit) return service.unitName ? `/ ${service.unitName}` : "/ Einheit"
+  return "Festpreis"
 }
 
 function normalize(value: string) {
@@ -296,7 +302,7 @@ export default function ServiceSearchPage() {
         </div>
       </section>
 
-      <section className="sticky top-16 z-20 mt-3 rounded-3xl border border-secondary bg-background/95 p-3 shadow-sm backdrop-blur">
+      <section className="sticky top-[4.25rem] z-20 mt-3 rounded-3xl border border-secondary bg-background/95 p-3 shadow-sm backdrop-blur">
         <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_0.55fr]">
           <label className="relative block">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text/35" size={18} />
@@ -404,7 +410,7 @@ export default function ServiceSearchPage() {
                 <p className="mt-2 line-clamp-3 text-sm leading-6 text-text/58">{service.description}</p>
                 <div className="mt-4 flex items-center gap-2 text-sm text-text/60"><BadgeCheck size={16} className="text-primary" /> {service.providerName}</div>
                 {service.city && <div className="mt-2 flex items-center gap-2 text-sm text-text/55"><MapPin size={16} /> {service.city} · {service.radius} km Radius</div>}
-                <div className="mt-5 flex items-end justify-between gap-3"><div><p className="text-xs text-text/40">Budget</p><p className="text-xl font-semibold text-text">{formatBudget(service)} <span className="text-sm font-medium text-text/45">{pricingLabel[service.pricingType]}</span></p></div><Link href={`/find-services/${service.id}`} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90">Details <ArrowRight size={15} /></Link></div>
+                <div className="mt-5 flex items-end justify-between gap-3"><div><p className="text-xs text-text/40">Budget</p><p className="text-xl font-semibold text-text">{formatBudget(service)} <span className="text-sm font-medium text-text/45">{formatPricingLabel(service)}</span></p></div><Link href={`/find-services/${service.id}`} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90">Details <ArrowRight size={15} /></Link></div>
               </div>
             </article>
           ))}
