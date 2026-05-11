@@ -31,7 +31,7 @@ interface AuthContextValue {
     displayName: string
   }) => Promise<AppUser>
   signInWithEmail: (email: string, password: string) => Promise<AppUser>
-  signInWithGoogle: () => Promise<AppUser>
+  signInWithGoogle: (role?: UserRole) => Promise<AppUser>
   logout: () => Promise<void>
 }
 
@@ -89,9 +89,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(appUser)
         return appUser
       },
-      signInWithGoogle: async () => {
+      signInWithGoogle: async (role = "provider") => {
         const credentials = await signInWithPopup(auth, googleProvider)
-        await ensureUserProfile(credentials.user, "provider")
+        await ensureUserProfile(credentials.user, role)
         const appUser = await getAppUser(credentials.user)
         setUser(appUser)
         return appUser
