@@ -60,8 +60,8 @@ export default function ServicesPage() {
   }
 
   async function handleCreate(values: ServiceFormValues) {
-    if (!user) {
-      setSubmitError("Du musst eingeloggt sein, um Services zu erstellen.")
+    if (!user?.numericId) {
+      setSubmitError("Deinem Profil fehlt noch die numerische User-ID. Bitte melde dich neu an oder speichere dein Profil erneut.")
       return
     }
 
@@ -71,7 +71,7 @@ export default function ServicesPage() {
     try {
       await createService({
         ...values,
-        providerId: user.uid,
+        providerId: user.numericId,
         providerName: user.displayName || user.email,
       })
 

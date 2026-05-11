@@ -254,16 +254,18 @@ async function seedBookings() {
   const bookingsRef = db.collection("bookings")
 
   for (const [i, b] of bookings.entries()) {
-    const docRef = bookingsRef.doc()
+    const id = i + 1
+    const docRef = bookingsRef.doc(String(id))
     const createdAt = daysAgo(b.createdDaysAgo)
     const requestedAt = createdAt
     const updatedAt = Timestamp.now()
 
     const bookingDoc: Record<string, unknown> = {
-      // 🔗 Referenzen (Test-IDs wie in den anderen Seed-Scripts)
-      serviceId: `test-service-${randomInt(1, 15)}`,
-      providerId: `test-provider-${randomInt(1, 5)}`,
-      customerId: `test-customer-${randomInt(1, 8)}`,
+      // 🔗 Numerische Referenzen
+      id,
+      serviceId: randomInt(1, 15),
+      providerId: randomInt(1, 5),
+      customerId: randomInt(1, 8),
 
       // 📄 Mini-Snapshot vom Service
       serviceTitle: b.serviceTitle,
@@ -304,7 +306,7 @@ async function seedBookings() {
     // Status-spezifische Felder
     if (b.status === BookingStatus.accepted) {
       bookingDoc.acceptedAt = updatedAt
-      bookingDoc.jobId = `test-job-${randomInt(1000, 9999)}`
+      bookingDoc.jobId = randomInt(1, 15)
     } else if (b.status === BookingStatus.declined) {
       bookingDoc.declinedAt = updatedAt
       if (b.declineMessage !== undefined) {
@@ -326,6 +328,8 @@ async function seedBookings() {
         `\n      [${b.categoryId}] · ${b.location.address} · ${priceLabel} · ${b.status}`
     )
   }
+
+  batch.set(bookingsRef.doc("counter"), { count: bookings.length }, { merge: true })
 
   await batch.commit()
   console.log(

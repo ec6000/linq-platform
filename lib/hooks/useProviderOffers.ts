@@ -7,7 +7,7 @@ import { OfferStatus } from "@/lib/types/offer"
 
 export interface ProviderOffer {
   id: string
-  orderId: string
+  orderId: number
   orderTitle: string
   priceInCent: number
   comment: string
@@ -15,7 +15,7 @@ export interface ProviderOffer {
   createdAt?: Timestamp
 }
 
-export function useProviderOffers(providerId?: string) {
+export function useProviderOffers(providerId?: number) {
   const [offers, setOffers] = useState<ProviderOffer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

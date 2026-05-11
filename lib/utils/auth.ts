@@ -1,4 +1,4 @@
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore"
+import { doc, getDoc, runTransaction, serverTimestamp, setDoc } from "firebase/firestore"
 import { User } from "firebase/auth"
 import { db } from "@/lib/firebase/firebase"
 import { AppUser, UserRole } from "@/lib/types/user"
@@ -13,13 +13,39 @@ function splitName(displayName: string) {
   return { firstName, lastName: rest.join(" ") }
 }
 
+async function getOrCreateUserNumericId(uid: string) {
+  const userRef = doc(db, "users", uid)
+  const counterRef = doc(db, "users", "counter")
+
+  return runTransaction(db, async (transaction) => {
+    const userSnapshot = await transaction.get(userRef)
+    const existingId = userSnapshot.exists() ? userSnapshot.data().id : undefined
+
+    if (typeof existingId === "number") {
+      return existingId
+    }
+
+    const counterSnapshot = await transaction.get(counterRef)
+    const currentCount = counterSnapshot.exists() ? Number(counterSnapshot.data().count ?? 0) : 0
+    const nextId = currentCount + 1
+
+    transaction.set(counterRef, { count: nextId }, { merge: true })
+    transaction.set(userRef, { id: nextId, updatedAt: serverTimestamp() }, { merge: true })
+
+    return nextId
+  })
+}
+
 export async function ensureUserProfile(user: User, role: UserRole = "provider") {
   const userRef = doc(db, "users", user.uid)
   const snapshot = await getDoc(userRef)
   const { firstName, lastName } = splitName(user.displayName ?? "")
 
   if (!snapshot.exists()) {
+    const numericId = await getOrCreateUserNumericId(user.uid)
+
     await setDoc(userRef, {
+      id: numericId,
       email: user.email ?? "",
       firstName,
       lastName,
@@ -35,6 +61,10 @@ export async function ensureUserProfile(user: User, role: UserRole = "provider")
 
   const data = snapshot.data()
   const updates: Record<string, unknown> = { updatedAt: serverTimestamp() }
+
+  if (typeof data.id !== "number") {
+    updates.id = await getOrCreateUserNumericId(user.uid)
+  }
 
   if (!data.role || !["provider", "customer"].includes(data.role)) {
     updates.role = role
@@ -65,6 +95,7 @@ export async function getAppUser(user: User, fallbackRole: UserRole = "provider"
     await ensureUserProfile(user, fallbackRole)
     return {
       uid: user.uid,
+      numericId: await getOrCreateUserNumericId(user.uid),
       email: user.email ?? "",
       displayName: user.displayName ?? "",
       role: fallbackRole,
@@ -72,6 +103,7 @@ export async function getAppUser(user: User, fallbackRole: UserRole = "provider"
   }
 
   const data = snapshot.data()
+  const numericId = typeof data.id === "number" ? data.id : await getOrCreateUserNumericId(user.uid)
   const role: UserRole = data.role === "customer" ? "customer" : "provider"
   const firstName = typeof data.firstName === "string" ? data.firstName : ""
   const lastName = typeof data.lastName === "string" ? data.lastName : ""
@@ -79,6 +111,7 @@ export async function getAppUser(user: User, fallbackRole: UserRole = "provider"
 
   return {
     uid: user.uid,
+    numericId,
     email: user.email ?? "",
     displayName: fullName || user.displayName || "",
     role,

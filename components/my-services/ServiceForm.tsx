@@ -59,8 +59,12 @@ export default function ServiceForm({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setValues(initialValues)
-    setError(null)
+    const resetTimer = window.setTimeout(() => {
+      setValues(initialValues)
+      setError(null)
+    }, 0)
+
+    return () => window.clearTimeout(resetTimer)
   }, [initialValues])
 
   const showUnitName = values.pricingType === PricingType.perUnit
