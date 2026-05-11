@@ -2,17 +2,18 @@ import { Timestamp, GeoPoint } from "firebase/firestore"
 import { PricingType } from "./service"
 
 export interface Job {
-  id: string
+  id: number
+  firestoreId: string
 
   // Herkunft
   sourceType: JobSourceType
-  sourceId: string // orderId oder serviceId
-  offerId?: string
-  bookingId?: string
+  sourceId: number // orderId oder serviceId
+  offerId?: number
+  bookingId?: number
 
   // Beteiligte
-  customerId: string
-  providerId: string
+  customerId: number
+  providerId: number
 
   // Snapshot
   title: string

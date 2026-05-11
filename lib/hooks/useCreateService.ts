@@ -1,11 +1,12 @@
 "use client"
 
-import { addDoc, collection, serverTimestamp, GeoPoint } from "firebase/firestore"
+import { doc, serverTimestamp, setDoc, GeoPoint } from "firebase/firestore"
 import { db } from "@/lib/firebase/firebase"
+import { getNextNumericId } from "@/lib/firebase/counters"
 import { PricingType, ServiceStatus } from "@/lib/types/service"
 
 export interface CreateServiceInput {
-  providerId: string
+  providerId: number
   providerName: string
   title: string
   description: string
@@ -19,13 +20,20 @@ export interface CreateServiceInput {
   city?: string
   categoryId: string
   categoryName?: string
+  subcategoryId?: string
+  subcategoryName?: string
 }
 
 export async function createService(input: CreateServiceInput) {
-  await addDoc(collection(db, "services"), {
+  const id = await getNextNumericId("services")
+
+  await setDoc(doc(db, "services", String(id)), {
+    id,
     ...input,
     location: new GeoPoint(0, 0),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
+
+  return id
 }

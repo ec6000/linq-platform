@@ -15,10 +15,18 @@ export function useBookings() {
       try {
         const snapshot = await getDocs(collection(db, "bookings"))
 
-        const data: Booking[] = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as Omit<Booking, "id">),
-        }))
+        const data: Booking[] = snapshot.docs
+          .filter((doc) => doc.id !== "counter")
+          .map((doc) => {
+            const raw = doc.data() as Omit<Booking, "id" | "firestoreId"> & { id?: number }
+            const numericId = typeof raw.id === "number" ? raw.id : Number(doc.id)
+
+            return {
+              ...raw,
+              id: numericId,
+              firestoreId: doc.id,
+            }
+          })
 
         setBookings(data)
         setError(null)

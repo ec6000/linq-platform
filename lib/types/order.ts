@@ -1,11 +1,12 @@
 import { Timestamp, GeoPoint } from "firebase/firestore"
 
 export interface Order {
-  id: string
+  id: number
+  firestoreId: string
   title: string
   description: string
   customerName: string
-  customerId: string
+  customerId: number
   status: OrderStatus
   priority: OrderPriority
   
@@ -33,7 +34,7 @@ export interface Order {
   thumbnailUrl?: string
   
   // Assignment
-  assignedProviderId?: string
+  assignedProviderId?: number
   assignedAt?: Timestamp
   
   // Timestamps

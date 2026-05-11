@@ -1,6 +1,7 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import * as path from 'path';
+import { readFileSync } from 'fs';
 
 // ────────────────────────────────────────────────────────────
 // Firebase Admin Init
@@ -10,10 +11,9 @@ import * as path from 'path';
 // WICHTIG: Diese Datei in .gitignore aufnehmen!
 
 if (!getApps().length) {
-  const serviceAccount = require(path.resolve(
-    process.cwd(),
-    'serviceAccountKey.json'
-  ));
+  const serviceAccount = JSON.parse(
+    readFileSync(path.resolve(process.cwd(), 'serviceAccountKey.json'), 'utf-8')
+  );
   initializeApp({
     credential: cert(serviceAccount),
   });

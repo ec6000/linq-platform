@@ -51,7 +51,7 @@ function formatDateTimeRange(order: Order) {
 
 export default function DetailedOrderPage() {
   const params = useParams<{ orderId: string }>()
-  const orderId = params.orderId
+  const orderId = Number(params.orderId)
 
   const { orders, loading, error } = useOrders()
   const { categories } = useCategories()
