@@ -15,7 +15,7 @@ export default function SignUpPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState<UserRole>("provider")
+  const [role, setRole] = useState<UserRole>("customer")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -45,7 +45,7 @@ export default function SignUpPage() {
     setLoading(true)
 
     try {
-      const appUser = await signInWithGoogle()
+      const appUser = await signInWithGoogle(role)
       router.replace(getHomeForRole(appUser.role))
     } catch (err) {
       console.error(err)
@@ -58,7 +58,7 @@ export default function SignUpPage() {
   return (
     <AuthCard
       title="Sign up"
-      subtitle="Erstelle dein Konto und starte direkt."
+      subtitle="Erstelle dein Konto als Kunde oder Provider und starte direkt."
       footerText="Schon registriert?"
       footerLinkText="Login"
       footerHref="/login"
@@ -97,17 +97,52 @@ export default function SignUpPage() {
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-text/70">
-          Rolle
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as UserRole)}
-            className="rounded-xl border border-secondary bg-background px-3 py-2.5 text-[14px] outline-none transition focus:border-primary/40"
-          >
-            <option value="provider">Provider</option>
-            <option value="customer">Customer</option>
-          </select>
-        </label>
+        <fieldset className="space-y-2">
+          <legend className="text-sm text-text/70">Registrieren als</legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              {
+                value: "customer" as const,
+                title: "Kunde",
+                description: "Aufträge erstellen und passende Provider finden.",
+              },
+              {
+                value: "provider" as const,
+                title: "Provider",
+                description: "Services anbieten und Jobs annehmen.",
+              },
+            ].map((option) => {
+              const selected = role === option.value
+
+              return (
+                <label
+                  key={option.value}
+                  className={`cursor-pointer rounded-xl border p-3 transition ${
+                    selected
+                      ? "border-primary bg-primary/5 text-text"
+                      : "border-secondary text-text/65 hover:bg-secondary/30"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value={option.value}
+                    checked={selected}
+                    onChange={(e) => setRole(e.target.value as UserRole)}
+                    className="sr-only"
+                  />
+                  <span className="block text-sm font-medium">{option.title}</span>
+                  <span className="mt-1 block text-xs leading-5 text-text/55">
+                    {option.description}
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+          <p className="text-xs text-text/45">
+            Diese Auswahl gilt auch, wenn du dich mit Google registrierst.
+          </p>
+        </fieldset>
 
         {error && <p className="text-sm text-red-500">{error}</p>}
 
