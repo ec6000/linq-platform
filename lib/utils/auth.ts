@@ -57,17 +57,17 @@ export async function ensureUserProfile(user: User, role: UserRole = "provider")
   }
 }
 
-export async function getAppUser(user: User): Promise<AppUser> {
+export async function getAppUser(user: User, fallbackRole: UserRole = "provider"): Promise<AppUser> {
   const userRef = doc(db, "users", user.uid)
   const snapshot = await getDoc(userRef)
 
   if (!snapshot.exists()) {
-    await ensureUserProfile(user)
+    await ensureUserProfile(user, fallbackRole)
     return {
       uid: user.uid,
       email: user.email ?? "",
       displayName: user.displayName ?? "",
-      role: "provider",
+      role: fallbackRole,
     }
   }
 
@@ -86,7 +86,7 @@ export async function getAppUser(user: User): Promise<AppUser> {
 }
 
 export function getHomeForRole(role: UserRole) {
-  return role === "customer" ? "/customer-profile" : "/dashboard"
+  return role === "customer" ? "/customer-dashboard" : "/dashboard"
 }
 
 export function getProfileForRole(role: UserRole) {
