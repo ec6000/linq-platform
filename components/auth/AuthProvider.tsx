@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 import {
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null)
   const [user, setUser] = useState<AppUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const pendingGoogleRole = useRef<UserRole | null>(null)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
@@ -53,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const appUser = await getAppUser(nextUser)
+        const appUser = await getAppUser(nextUser, pendingGoogleRole.current ?? "provider")
         setUser(appUser)
       } catch (error) {
         console.error(error)
@@ -90,11 +92,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return appUser
       },
       signInWithGoogle: async (role = "provider") => {
-        const credentials = await signInWithPopup(auth, googleProvider)
-        await ensureUserProfile(credentials.user, role)
-        const appUser = await getAppUser(credentials.user)
-        setUser(appUser)
-        return appUser
+        pendingGoogleRole.current = role
+
+        try {
+          const credentials = await signInWithPopup(auth, googleProvider)
+          await ensureUserProfile(credentials.user, role)
+          const appUser = await getAppUser(credentials.user, role)
+          setUser(appUser)
+          return appUser
+        } finally {
+          pendingGoogleRole.current = null
+        }
       },
       logout: async () => {
         await signOut(auth)

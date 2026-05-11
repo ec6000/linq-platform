@@ -15,7 +15,7 @@ import { useState } from "react";
 import "@/app/globals.css";
 import { Expletus_Sans } from "next/font/google";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { getProfileForRole } from "@/lib/utils/auth";
+import { getHomeForRole, getProfileForRole } from "@/lib/utils/auth";
 
 const expletus = Expletus_Sans({
   subsets: ["latin"],
@@ -35,7 +35,7 @@ const providerNavItems = [
 ];
 
 const customerNavItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Dashboard", href: "/customer-dashboard", icon: LayoutDashboard },
 ];
 
 export default function Navbar({ userRole = "provider", userName = "E" }: NavbarProps) {
@@ -47,6 +47,7 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
   const navItems = userRole === "customer" ? customerNavItems : providerNavItems;
   const avatarLetter = userName.charAt(0).toUpperCase();
   const profileHref = getProfileForRole(userRole);
+  const homeHref = getHomeForRole(userRole);
 
   const handleLogout = async () => {
     await logout();
@@ -60,7 +61,7 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
     >
       <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-6 md:px-10">
         <Link
-          href="/dashboard"
+          href={homeHref}
           className="text-[22px] font-bold tracking-tight"
           style={{ color: "var(--primary)" }}
         >
