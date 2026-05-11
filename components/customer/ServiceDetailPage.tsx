@@ -6,6 +6,7 @@ import { useMemo, useState } from "react"
 import { ArrowLeft, BadgeCheck, CalendarClock, CheckCircle2, Loader2, MapPin, MessageSquare, ShieldCheck, Star } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createBooking } from "@/lib/hooks/useCreateBooking"
+import { useCategories } from "@/lib/hooks/useCategory"
 import { useServices } from "@/lib/hooks/useServices"
 import { PricingType } from "@/lib/types/service"
 
@@ -24,6 +25,7 @@ function formatBudget(minBudgetInCent: number, maxBudgetInCent: number, pricingT
 export default function ServiceDetailPage({ serviceId }: ServiceDetailPageProps) {
   const { user } = useAuth()
   const { services, loading, error } = useServices()
+  const { categories } = useCategories()
   const [message, setMessage] = useState("")
   const [requestedDateText, setRequestedDateText] = useState("")
   const [addressText, setAddressText] = useState("")
@@ -32,6 +34,10 @@ export default function ServiceDetailPage({ serviceId }: ServiceDetailPageProps)
   const [createdBookingId, setCreatedBookingId] = useState<number | null>(null)
 
   const service = useMemo(() => services.find((item) => item.id === serviceId), [serviceId, services])
+  const categoryName = useMemo(() => {
+    if (!service) return "Kategorie"
+    return service.categoryName || categories.find((category) => category.id === service.categoryId)?.nameDE || "Kategorie"
+  }, [categories, service])
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -77,23 +83,22 @@ export default function ServiceDetailPage({ serviceId }: ServiceDetailPageProps)
   }
 
   if (error || !service) {
-    return <main className="mx-auto max-w-[1200px] px-6 py-10"><Link href="/service-finden" className="inline-flex items-center gap-2 text-sm text-primary"><ArrowLeft size={16} /> Zur Suche</Link><div className="mt-6 rounded-3xl border border-secondary p-8"><h1 className="text-xl font-semibold text-text">Service nicht gefunden</h1><p className="mt-2 text-sm text-text/55">Der Service ist nicht mehr verfügbar oder wurde entfernt.</p></div></main>
+    return <main className="mx-auto max-w-[1200px] px-6 py-10"><Link href="/find-services" className="inline-flex items-center gap-2 text-sm text-primary"><ArrowLeft size={16} /> Zur Suche</Link><div className="mt-6 rounded-3xl border border-secondary p-8"><h1 className="text-xl font-semibold text-text">Service nicht gefunden</h1><p className="mt-2 text-sm text-text/55">Der Service ist nicht mehr verfügbar oder wurde entfernt.</p></div></main>
   }
 
   return (
     <main className="mx-auto max-w-[1400px] px-6 py-8 md:px-10">
-      <Link href="/service-finden" className="mb-5 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-text/60 transition hover:bg-secondary hover:text-text"><ArrowLeft size={16} /> Zurück zur Suche</Link>
+      <Link href="/find-services" className="mb-5 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-text/60 transition hover:bg-secondary hover:text-text"><ArrowLeft size={16} /> Zurück zur Suche</Link>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
         <section className="overflow-hidden rounded-[2rem] border border-secondary bg-background">
           <div className="relative h-[340px] bg-secondary md:h-[440px]">
             {service.imageUrl ? <Image src={service.imageUrl} alt={service.title} fill priority sizes="(min-width: 1024px) 60vw, 100vw" className="object-cover" /> : <div className="flex h-full items-center justify-center text-text/35">Kein Bild vorhanden</div>}
-            <div className="absolute left-5 top-5 rounded-full bg-background/90 px-3 py-1 text-sm font-medium text-text shadow-sm">Service #{service.id}</div>
           </div>
 
           <div className="p-6 md:p-8">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">{service.categoryName || service.categoryId}</span>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">{categoryName}</span>
               <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-3 py-1 text-sm font-medium text-accent"><Star size={14} className="fill-accent" /> 4,9 Bewertung</span>
               <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-sm font-medium text-text/60"><ShieldCheck size={14} /> geprüfter Anbieter</span>
             </div>
