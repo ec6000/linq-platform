@@ -1,10 +1,10 @@
 import { Timestamp, GeoPoint } from "firebase/firestore"
-import { Category } from "./category"
 
 export interface Service {
-  id: string
+  id: number
+  firestoreId: string
 
-  providerId: string
+  providerId: number
   providerName: string
 
   title: string
@@ -24,6 +24,9 @@ export interface Service {
 
   categoryId: string
   categoryName?: string
+  subcategoryId?: string
+  subcategoryName?: string
+  bookingIds?: number[]
 
   createdAt: Timestamp
   updatedAt: Timestamp

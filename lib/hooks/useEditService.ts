@@ -17,10 +17,12 @@ export interface EditServiceInput {
   city?: string
   categoryId: string
   categoryName?: string
+  subcategoryId?: string
+  subcategoryName?: string
 }
 
-export async function editService(serviceId: string, input: EditServiceInput) {
-  await updateDoc(doc(db, "services", serviceId), {
+export async function editService(serviceId: number, input: EditServiceInput) {
+  await updateDoc(doc(db, "services", String(serviceId)), {
     ...input,
     updatedAt: serverTimestamp(),
   })

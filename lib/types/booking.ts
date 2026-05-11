@@ -2,12 +2,13 @@ import { Timestamp, GeoPoint } from "firebase/firestore"
 import { PricingType } from "./service"
 
 export interface Booking {
-  id: string
+  id: number
+  firestoreId: string
 
   // 🔗 Referenzen
-  serviceId: string
-  providerId: string
-  customerId: string
+  serviceId: number
+  providerId: number
+  customerId: number
 
   // 📄 Mini-Snapshot vom Service (zum Zeitpunkt der Anfrage)
   serviceTitle: string
@@ -32,7 +33,7 @@ export interface Booking {
   status: BookingStatus
 
   // 🔗 Wenn daraus ein Job wird
-  jobId?: string
+  jobId?: number
 
   // 🧾 Meta
   createdAt: Timestamp

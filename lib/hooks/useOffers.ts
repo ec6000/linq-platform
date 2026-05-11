@@ -6,11 +6,11 @@ import { db } from "@/lib/firebase/firebase"
 import { OfferStatus } from "@/lib/types/offer"
 
 interface CreateOfferParams {
-  orderId: string
+  orderId: number
   orderTitle: string
   priceInCent: number
   comment: string
-  providerId: string
+  providerId: number
 }
 
 export function useOffer() {
@@ -23,7 +23,7 @@ export function useOffer() {
 
     try {
 
-      await addDoc(collection(db, "orders", orderId, "offers"), {
+      await addDoc(collection(db, "orders", String(orderId), "offers"), {
         priceInCent,
         comment,
         orderId,

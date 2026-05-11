@@ -9,12 +9,12 @@ export function useUpdateServiceStatus() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function updateServiceStatus(serviceId: string, status: ServiceStatus) {
+  async function updateServiceStatus(serviceId: number, status: ServiceStatus) {
     setLoading(true)
     setError(null)
 
     try {
-      await updateDoc(doc(db, "services", serviceId), { status })
+      await updateDoc(doc(db, "services", String(serviceId)), { status })
     } catch (err) {
       console.error(err)
       setError("Status konnte nicht aktualisiert werden")

@@ -17,10 +17,18 @@ export function useServices() {
     try {
       const snapshot = await getDocs(collection(db, "services"))
 
-      const data: Service[] = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as Omit<Service, "id">),
-      }))
+      const data: Service[] = snapshot.docs
+        .filter((doc) => doc.id !== "counter")
+        .map((doc) => {
+          const raw = doc.data() as Omit<Service, "id" | "firestoreId"> & { id?: number }
+          const numericId = typeof raw.id === "number" ? raw.id : Number(doc.id)
+
+          return {
+            ...raw,
+            id: numericId,
+            firestoreId: doc.id,
+          }
+        })
 
       setServices(data)
     } catch (err) {

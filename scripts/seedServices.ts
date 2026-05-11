@@ -41,6 +41,34 @@ interface ServiceSeed {
   imageUrl?: string
 }
 
+
+const defaultSubcategoriesByCategory: Record<string, { id: string; nameDE: string }> = {
+  automotive: { id: "fahrzeugpflege", nameDE: "Fahrzeugpflege" },
+  cleaning: { id: "wohnungsreinigung", nameDE: "Wohnungsreinigung" },
+  gardening: { id: "gartenpflege-allgemein", nameDE: "Gartenpflege allgemein" },
+  handyman: { id: "moebelaufbau", nameDE: "Möbelaufbau" },
+  household: { id: "einkaufen", nameDE: "Einkaufen" },
+  moving: { id: "umzugshilfe", nameDE: "Umzugshilfe" },
+  other: { id: "sonstige-hilfe", nameDE: "Sonstige Hilfe" },
+}
+
+function getSubcategoryForService(service: ServiceSeed) {
+  const title = service.title.toLowerCase()
+
+  if (title.includes("fenster")) return { id: "fensterreinigung", nameDE: "Fensterreinigung" }
+  if (title.includes("reinigung") || title.includes("endreinigung")) return { id: "wohnungsreinigung", nameDE: "Wohnungsreinigung" }
+  if (title.includes("maler") || title.includes("streich")) return { id: "malerarbeiten", nameDE: "Malerarbeiten" }
+  if (title.includes("silikon") || title.includes("reparatur")) return { id: "kleine-reparaturen", nameDE: "Kleine Reparaturen" }
+  if (title.includes("pflanzen")) return { id: "giessen-bei-abwesenheit", nameDE: "Gießen bei Abwesenheit" }
+  if (title.includes("nachhilfe")) return { id: "nachhilfe", nameDE: "Nachhilfe" }
+  if (title.includes("auto")) return { id: "fahrzeugpflege", nameDE: "Fahrzeugpflege" }
+  if (title.includes("einkauf")) return { id: "einkaufen", nameDE: "Einkaufen" }
+  if (title.includes("umzug") || title.includes("transport")) return { id: "umzugshilfe", nameDE: "Umzugshilfe" }
+  if (title.includes("garten") || title.includes("hecke")) return { id: "gartenpflege-allgemein", nameDE: "Gartenpflege allgemein" }
+
+  return defaultSubcategoriesByCategory[service.categoryId]
+}
+
 const services: ServiceSeed[] = [
   {
     title: "Umzugshilfe & Möbeltransport mit eigenem Transporter",
@@ -281,11 +309,15 @@ async function seedServices() {
   const servicesRef = db.collection("services")
 
   for (const [i, s] of services.entries()) {
-    const docRef = servicesRef.doc()
+    const id = i + 1
+    const docRef = servicesRef.doc(String(id))
     const now = Timestamp.now()
 
+    const subcategory = getSubcategoryForService(s)
+
     const serviceDoc: Record<string, unknown> = {
-      providerId: `test-provider-${randomInt(1, 5)}`,
+      id,
+      providerId: randomInt(1, 5),
       providerName: s.providerName,
       title: s.title,
       description: s.description,
@@ -297,6 +329,8 @@ async function seedServices() {
       radius: s.radius,
       city: s.location.city,
       categoryId: s.categoryId,
+      subcategoryId: subcategory?.id,
+      subcategoryName: subcategory?.nameDE,
       createdAt: now,
       updatedAt: now,
     }
@@ -316,6 +350,8 @@ async function seedServices() {
         `\n      [${s.categoryId}] · ${s.location.city} · ${priceLabel} · ${s.status}`
     )
   }
+
+  batch.set(servicesRef.doc("counter"), { count: services.length }, { merge: true })
 
   await batch.commit()
   console.log(
