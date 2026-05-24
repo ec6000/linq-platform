@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { collection, deleteDoc, doc, getDocs, updateDoc } from "firebase/firestore"
 import { ClipboardList, Clock3, MapPin, Pencil, Tag, Trash2, X } from "lucide-react"
 import { db } from "@/lib/firebase/firebase"
@@ -57,8 +57,29 @@ export default function CustomerMyOrdersPage() {
   const [offersLoading, setOffersLoading] = useState(false)
   const [offerActionLoading, setOfferActionLoading] = useState<string | null>(null)
   const [declineComment, setDeclineComment] = useState("")
+  const [offerCounts, setOfferCounts] = useState<Record<number, number>>({})
 
   const visibleOrders = useMemo(() => orders.slice().sort((a, b) => b.id - a.id), [orders])
+
+  useEffect(() => {
+    async function loadOfferCounts() {
+      const entries = await Promise.all(
+        visibleOrders.map(async (order) => {
+          const snapshot = await getDocs(collection(db, "orders", String(order.id), "offers"))
+          return [order.id, snapshot.size] as const
+        }),
+      )
+
+      setOfferCounts(Object.fromEntries(entries))
+    }
+
+    if (visibleOrders.length === 0) {
+      setOfferCounts({})
+      return
+    }
+
+    loadOfferCounts()
+  }, [visibleOrders])
 
   async function openOffers(orderId: number) {
     setOfferOrderId(orderId)
@@ -104,6 +125,7 @@ export default function CustomerMyOrdersPage() {
     )
     setDeclineComment("")
     setOfferActionLoading(null)
+    setOfferOrderId(null)
   }
 
   return (
@@ -181,10 +203,15 @@ export default function CustomerMyOrdersPage() {
                 </button>
                 <button
                   type="button"
+                  disabled={(offerCounts[order.id] ?? 0) === 0}
                   onClick={() => openOffers(order.id)}
-                  className="rounded-xl bg-primary px-4 py-2 text-[13px] font-medium text-white transition hover:opacity-90"
+                  className={`rounded-xl px-4 py-2 text-[13px] font-medium transition ${
+                    (offerCounts[order.id] ?? 0) === 0
+                      ? "bg-secondary text-text/45 cursor-not-allowed"
+                      : "bg-primary text-white hover:opacity-90"
+                  }`}
                 >
-                  Preisangebote anzeigen
+                  Preisvorschläge ({offerCounts[order.id] ?? 0})
                 </button>
               </div>
             </article>
