@@ -145,27 +145,27 @@ export default function CustomerMyOrdersPage() {
         </section>
       )}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <section className="space-y-4">
         {visibleOrders.map((order) => {
           const locationText = order.address?.trim() || "Ort nicht angegeben"
 
           return (
             <article
               key={order.id}
-              className="rounded-2xl border border-secondary bg-background px-4 py-4 transition hover:border-primary/30 hover:shadow-sm sm:px-6 sm:py-5"
+              className="rounded-2xl border border-secondary bg-background px-5 py-5 transition hover:border-primary/30 hover:shadow-sm sm:px-6 sm:py-5"
             >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 space-y-2">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-[15px] font-medium leading-snug text-text">{order.title}</h2>
+                    <h2 className="text-[18px] font-semibold leading-snug text-text">{order.title}</h2>
                     <span className={`rounded-full px-3 py-1 text-[12px] font-medium ${statusStyle[order.status]}`}>
                       {statusLabel[order.status]}
                     </span>
                   </div>
 
-                  <p className="line-clamp-3 text-[13px] leading-6 text-text/60">{order.description}</p>
+                  <p className="line-clamp-2 text-[14px] leading-6 text-text/65">{order.description}</p>
 
-                  <div className="space-y-1 text-[13px] text-text/60">
+                  <div className="grid gap-1.5 text-[13px] text-text/60 sm:grid-cols-2">
                     <p className="flex items-center gap-1.5">
                       <Clock3 size={14} className="text-text/40" />
                       {formatDateRange(order)}
@@ -186,7 +186,7 @@ export default function CustomerMyOrdersPage() {
 
               <div className="my-4 border-t border-secondary" />
 
-              <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setDeletingOrderId(order.id)}
