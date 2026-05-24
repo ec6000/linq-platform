@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { collection, deleteDoc, doc, getDocs, updateDoc } from "firebase/firestore"
-import { ClipboardList, Clock3, MapPin, Pencil, Tag, Trash2, X } from "lucide-react"
+import { ClipboardList, Pencil, Trash2, X } from "lucide-react"
 import { db } from "@/lib/firebase/firebase"
 import { useOrders } from "@/lib/hooks/useOrders"
-import { Order, OrderPriority, OrderStatus } from "@/lib/types/order"
+import { OrderStatus } from "@/lib/types/order"
 
 const statusLabel: Record<OrderStatus, string> = {
   [OrderStatus.available]: "Offen",
@@ -23,28 +23,12 @@ const statusStyle: Record<OrderStatus, string> = {
   [OrderStatus.cancelled]: "bg-secondary text-text/60",
 }
 
-const priorityLabel: Record<OrderPriority, string> = {
-  [OrderPriority.low]: "Niedrig",
-  [OrderPriority.normal]: "Normal",
-  [OrderPriority.high]: "Hoch",
-  [OrderPriority.urgent]: "Dringend",
-}
-
 type OrderOffer = {
   id: string
   priceInCent: number
   comment?: string
   providerId?: number
   status?: "pending" | "accepted" | "declined"
-}
-
-function formatDateRange(order: Order) {
-  const start = order.timeWindow?.start?.toDate?.()
-  const end = order.timeWindow?.end?.toDate?.()
-
-  if (!start || !end) return "Zeitfenster folgt"
-
-  return `${start.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })} · ${start.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}-${end.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`
 }
 
 export default function CustomerMyOrdersPage() {
@@ -58,6 +42,8 @@ export default function CustomerMyOrdersPage() {
   const [offerActionLoading, setOfferActionLoading] = useState<string | null>(null)
   const [declineComment, setDeclineComment] = useState("")
   const [offerCounts, setOfferCounts] = useState<Record<number, number>>({})
+  const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all")
+  const [offerFilter, setOfferFilter] = useState<"all" | "withOffers" | "withoutOffers">("all")
 
   const visibleOrders = useMemo(() => orders.slice().sort((a, b) => b.id - a.id), [orders])
 
@@ -80,6 +66,19 @@ export default function CustomerMyOrdersPage() {
 
     loadOfferCounts()
   }, [visibleOrders])
+
+  const filteredOrders = useMemo(() => {
+    return visibleOrders.filter((order) => {
+      const statusMatches = statusFilter === "all" || order.status === statusFilter
+      const offersCount = offerCounts[order.id] ?? 0
+      const offersMatches =
+        offerFilter === "all" ||
+        (offerFilter === "withOffers" && offersCount > 0) ||
+        (offerFilter === "withoutOffers" && offersCount === 0)
+
+      return statusMatches && offersMatches
+    })
+  }, [offerCounts, offerFilter, statusFilter, visibleOrders])
 
   async function openOffers(orderId: number) {
     setOfferOrderId(orderId)
@@ -145,10 +144,20 @@ export default function CustomerMyOrdersPage() {
         </section>
       )}
 
-      <section className="space-y-4">
-        {visibleOrders.map((order) => {
-          const locationText = order.address?.trim() || "Ort nicht angegeben"
+      {visibleOrders.length > 0 && (
+        <section className="mb-4 flex flex-wrap gap-2">
+          <button onClick={() => setStatusFilter("all")} className={`rounded-full px-3 py-1.5 text-xs font-medium ${statusFilter === "all" ? "bg-primary text-white" : "bg-secondary text-text/70"}`}>Alle Status</button>
+          {Object.values(OrderStatus).map((status) => (
+            <button key={status} onClick={() => setStatusFilter(status)} className={`rounded-full px-3 py-1.5 text-xs font-medium ${statusFilter === status ? "bg-primary text-white" : "bg-secondary text-text/70"}`}>{statusLabel[status]}</button>
+          ))}
+          <button onClick={() => setOfferFilter("all")} className={`rounded-full px-3 py-1.5 text-xs font-medium ${offerFilter === "all" ? "bg-primary text-white" : "bg-secondary text-text/70"}`}>Alle Vorschläge</button>
+          <button onClick={() => setOfferFilter("withOffers")} className={`rounded-full px-3 py-1.5 text-xs font-medium ${offerFilter === "withOffers" ? "bg-primary text-white" : "bg-secondary text-text/70"}`}>Mit Vorschlägen</button>
+          <button onClick={() => setOfferFilter("withoutOffers")} className={`rounded-full px-3 py-1.5 text-xs font-medium ${offerFilter === "withoutOffers" ? "bg-primary text-white" : "bg-secondary text-text/70"}`}>Ohne Vorschläge</button>
+        </section>
+      )}
 
+      <section className="space-y-4">
+        {filteredOrders.map((order) => {
           return (
             <article
               key={order.id}
@@ -165,22 +174,7 @@ export default function CustomerMyOrdersPage() {
 
                   <p className="line-clamp-2 text-[14px] leading-6 text-text/65">{order.description}</p>
 
-                  <div className="grid gap-1.5 text-[13px] text-text/60 sm:grid-cols-2">
-                    <p className="flex items-center gap-1.5">
-                      <Clock3 size={14} className="text-text/40" />
-                      {formatDateRange(order)}
-                    </p>
-
-                    <p className="flex items-center gap-1.5 truncate">
-                      <MapPin size={14} className="shrink-0 text-text/40" />
-                      <span className="truncate">{locationText}</span>
-                    </p>
-
-                    <p className="flex items-center gap-1.5">
-                      <Tag size={14} className="text-text/40" />
-                      <span>{priorityLabel[order.priority]} · {(order.budgetInCent / 100).toLocaleString("de-DE")}€</span>
-                    </p>
-                  </div>
+                  <p className="text-xs text-text/45">Auftrag #{order.id}</p>
                 </div>
               </div>
 
