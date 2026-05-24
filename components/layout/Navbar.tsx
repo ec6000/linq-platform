@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
+  ClipboardList,
   LayoutDashboard,
   Search,
   Wrench,
@@ -35,8 +36,8 @@ const providerNavItems = [
 ];
 
 const customerNavItems = [
-  { label: "Dashboard", href: "/customer-dashboard", icon: LayoutDashboard },
   { label: "Service finden", href: "/find-services", icon: Search },
+  { label: "Meine Aufträge", href: "/my-orders", icon: ClipboardList },
 ];
 
 export default function Navbar({ userRole = "provider", userName = "E" }: NavbarProps) {
