@@ -119,7 +119,7 @@ export async function getAppUser(user: User, fallbackRole: UserRole = "provider"
 }
 
 export function getHomeForRole(role: UserRole) {
-  return role === "customer" ? "/customer-dashboard" : "/dashboard"
+  return role === "customer" ? "/find-services" : "/dashboard"
 }
 
 export function getProfileForRole(role: UserRole) {
