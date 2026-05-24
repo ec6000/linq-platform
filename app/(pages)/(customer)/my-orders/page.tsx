@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { collection, deleteDoc, doc, getDocs, updateDoc } from "firebase/firestore"
 import { ClipboardList, Pencil, Trash2, X } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { db } from "@/lib/firebase/firebase"
 import { useOrders } from "@/lib/hooks/useOrders"
 import { OrderStatus } from "@/lib/types/order"
@@ -33,8 +35,8 @@ type OrderOffer = {
 
 export default function CustomerMyOrdersPage() {
   const { orders, loading, error } = useOrders()
+  const router = useRouter()
 
-  const [editingOrderId, setEditingOrderId] = useState<number | null>(null)
   const [deletingOrderId, setDeletingOrderId] = useState<number | null>(null)
   const [offerOrderId, setOfferOrderId] = useState<number | null>(null)
   const [offers, setOffers] = useState<OrderOffer[]>([])
@@ -43,7 +45,6 @@ export default function CustomerMyOrdersPage() {
   const [declineComment, setDeclineComment] = useState("")
   const [offerCounts, setOfferCounts] = useState<Record<number, number>>({})
   const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all")
-  const [offerFilter, setOfferFilter] = useState<"all" | "withOffers" | "withoutOffers">("all")
 
   const visibleOrders = useMemo(() => orders.slice().sort((a, b) => b.id - a.id), [orders])
 
@@ -52,7 +53,11 @@ export default function CustomerMyOrdersPage() {
       const entries = await Promise.all(
         visibleOrders.map(async (order) => {
           const snapshot = await getDocs(collection(db, "orders", String(order.id), "offers"))
-          return [order.id, snapshot.size] as const
+          const activeCount = snapshot.docs.filter((offerDoc) => {
+            const data = offerDoc.data() as { status?: string }
+            return data.status !== "declined"
+          }).length
+          return [order.id, activeCount] as const
         }),
       )
 
@@ -70,15 +75,9 @@ export default function CustomerMyOrdersPage() {
   const filteredOrders = useMemo(() => {
     return visibleOrders.filter((order) => {
       const statusMatches = statusFilter === "all" || order.status === statusFilter
-      const offersCount = offerCounts[order.id] ?? 0
-      const offersMatches =
-        offerFilter === "all" ||
-        (offerFilter === "withOffers" && offersCount > 0) ||
-        (offerFilter === "withoutOffers" && offersCount === 0)
-
-      return statusMatches && offersMatches
+      return statusMatches
     })
-  }, [offerCounts, offerFilter, statusFilter, visibleOrders])
+  }, [statusFilter, visibleOrders])
 
   async function openOffers(orderId: number) {
     setOfferOrderId(orderId)
@@ -132,6 +131,7 @@ export default function CustomerMyOrdersPage() {
       <div className="mb-5 flex items-center gap-3">
         <ClipboardList size={22} className="text-primary" strokeWidth={1.8} />
         <h1 className="text-[22px] font-semibold tracking-tight text-text">Meine Aufträge</h1>
+        <Link href="/my-orders/create" className="ml-auto rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90">Auftrag erstellen</Link>
       </div>
 
       {loading && <p className="rounded-2xl border border-secondary p-6 text-sm text-text/60">Aufträge werden geladen…</p>}
@@ -150,9 +150,6 @@ export default function CustomerMyOrdersPage() {
           {Object.values(OrderStatus).map((status) => (
             <button key={status} onClick={() => setStatusFilter(status)} className={`rounded-full px-3 py-1.5 text-xs font-medium ${statusFilter === status ? "bg-primary text-white" : "bg-secondary text-text/70"}`}>{statusLabel[status]}</button>
           ))}
-          <button onClick={() => setOfferFilter("all")} className={`rounded-full px-3 py-1.5 text-xs font-medium ${offerFilter === "all" ? "bg-primary text-white" : "bg-secondary text-text/70"}`}>Alle Vorschläge</button>
-          <button onClick={() => setOfferFilter("withOffers")} className={`rounded-full px-3 py-1.5 text-xs font-medium ${offerFilter === "withOffers" ? "bg-primary text-white" : "bg-secondary text-text/70"}`}>Mit Vorschlägen</button>
-          <button onClick={() => setOfferFilter("withoutOffers")} className={`rounded-full px-3 py-1.5 text-xs font-medium ${offerFilter === "withoutOffers" ? "bg-primary text-white" : "bg-secondary text-text/70"}`}>Ohne Vorschläge</button>
         </section>
       )}
 
@@ -190,7 +187,7 @@ export default function CustomerMyOrdersPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setEditingOrderId(order.id)}
+                  onClick={() => router.push(`/my-orders/${order.id}/edit`)}
                   className="rounded-xl px-4 py-2 text-[13px] font-medium text-text/70 transition hover:bg-secondary"
                 >
                   <span className="inline-flex items-center gap-1.5"><Pencil size={14} /> Bearbeiten</span>
@@ -205,23 +202,13 @@ export default function CustomerMyOrdersPage() {
                       : "bg-primary text-white hover:opacity-90"
                   }`}
                 >
-                  Preisvorschläge ({offerCounts[order.id] ?? 0})
+                  Preisangebote ({offerCounts[order.id] ?? 0})
                 </button>
               </div>
             </article>
           )
         })}
       </section>
-
-      {editingOrderId !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setEditingOrderId(null)}>
-          <div className="w-full max-w-md rounded-2xl bg-background p-6" onClick={(event) => event.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-text">Bearbeiten</h2>
-            <p className="mt-2 text-sm text-text/60">Der Bearbeiten-Flow folgt im nächsten Schritt (Order-Formular).</p>
-            <button onClick={() => setEditingOrderId(null)} className="mt-4 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white">Schließen</button>
-          </div>
-        </div>
-      )}
 
       {deletingOrderId !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setDeletingOrderId(null)}>
@@ -253,7 +240,7 @@ export default function CustomerMyOrdersPage() {
                   <p className="text-sm font-semibold text-text">{(offer.priceInCent / 100).toLocaleString("de-DE")} €</p>
                   {offer.providerId && <p className="text-xs text-text/50">Anbieter #{offer.providerId}</p>}
                   {offer.comment && <p className="mt-2 text-sm text-text/65">{offer.comment}</p>}
-                  <p className="mt-2 text-xs text-text/45">Status: {offer.status ?? "pending"}</p>
+                  <p className={`mt-2 text-xs ${offer.status === "declined" ? "text-text/35" : "text-text/45"}`}>Status: {offer.status ?? "pending"}</p>
 
                   <textarea
                     value={declineComment}
@@ -265,7 +252,7 @@ export default function CustomerMyOrdersPage() {
                   <div className="mt-3 flex gap-2">
                     <button
                       type="button"
-                      disabled={offerActionLoading === offer.id}
+                      disabled={offerActionLoading === offer.id || offer.status === "declined"}
                       onClick={() => handleOfferDecision(offer.id, "declined")}
                       className="flex-1 rounded-xl border border-secondary px-3 py-2 text-sm"
                     >
@@ -273,7 +260,7 @@ export default function CustomerMyOrdersPage() {
                     </button>
                     <button
                       type="button"
-                      disabled={offerActionLoading === offer.id}
+                      disabled={offerActionLoading === offer.id || offer.status === "declined"}
                       onClick={() => handleOfferDecision(offer.id, "accepted")}
                       className="flex-1 rounded-xl bg-primary px-3 py-2 text-sm font-medium text-white"
                     >
