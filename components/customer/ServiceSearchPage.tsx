@@ -125,6 +125,7 @@ export default function ServiceSearchPage() {
   const [radiusKm, setRadiusKm] = useState(10)
   const [maxBudget, setMaxBudget] = useState("")
   const [sortKey, setSortKey] = useState<SortKey>("recommended")
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === categoryId),
@@ -285,16 +286,16 @@ export default function ServiceSearchPage() {
 
   return (
     <main className="mx-auto max-w-[1600px] px-6 py-5 md:px-10 md:py-6">
-      <section className="overflow-hidden rounded-[1.75rem] border border-secondary bg-gradient-to-br from-primary/10 via-background to-accent/10 p-5 md:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <section className="overflow-hidden rounded-[1.5rem] border border-secondary bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4 md:rounded-[1.75rem] md:p-6">
+        <div className="flex flex-col gap-4 md:gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/70 px-3 py-1 text-[13px] font-medium text-primary">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/70 px-3 py-1 text-xs font-medium text-primary md:mb-3 md:text-[13px]">
               <Sparkles size={14} /> Service finden
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-text md:text-4xl">Finde genau den Service, der zu deinem Auftrag passt.</h1>
-            <p className="mt-3 max-w-2xl text-[14px] leading-6 text-text/65">Suche nach Tätigkeit, Anbieter, Kategorie oder Ort. Feine Filter helfen dir, Budget, Einsatzgebiet und Abrechnungsmodell passend einzugrenzen.</p>
+            <h1 className="text-xl font-semibold tracking-tight text-text md:text-4xl">Finde genau den Service, der zu deinem Auftrag passt.</h1>
+            <p className="mt-2 max-w-2xl text-[13px] leading-5 text-text/65 md:mt-3 md:text-[14px] md:leading-6">Suche nach Tätigkeit, Anbieter, Kategorie oder Ort. Feine Filter helfen dir, Budget, Einsatzgebiet und Abrechnungsmodell passend einzugrenzen.</p>
           </div>
-          <div className="grid min-w-[220px] grid-cols-3 gap-2 rounded-2xl border border-secondary bg-background/80 p-3 text-center shadow-sm">
+          <div className="hidden min-w-[220px] grid-cols-3 gap-2 rounded-2xl border border-secondary bg-background/80 p-3 text-center shadow-sm md:grid">
             <div><p className="text-xl font-semibold text-text">{activeServices.length}</p><p className="text-xs text-text/45">aktive Services</p></div>
             <div><p className="text-xl font-semibold text-text">{categories.length}</p><p className="text-xs text-text/45">Kategorien</p></div>
             <div><p className="text-xl font-semibold text-text">24h</p><p className="text-xs text-text/45">Ø Antwort</p></div>
@@ -302,8 +303,23 @@ export default function ServiceSearchPage() {
         </div>
       </section>
 
-      <section className="sticky top-[4.25rem] z-20 mt-3 rounded-3xl border border-secondary bg-background/95 p-3 shadow-sm backdrop-blur">
-        <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_0.55fr]">
+      <section className="sticky top-[4.25rem] z-20 mt-3 rounded-3xl border border-secondary bg-background/95 p-2.5 shadow-sm backdrop-blur md:p-3">
+        <button
+          type="button"
+          onClick={() => setMobileFiltersOpen((previous) => !previous)}
+          className="mb-2 flex w-full items-center justify-between rounded-2xl border border-secondary px-3 py-2 text-sm font-medium text-text md:hidden"
+        >
+          <span className="inline-flex items-center gap-2">
+            <SlidersHorizontal size={15} />
+            Suche & Filter
+          </span>
+          <ChevronDown
+            size={16}
+            className={`transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        <div className={`${mobileFiltersOpen ? "grid" : "hidden"} gap-3 md:grid lg:grid-cols-[1.4fr_1fr_0.55fr]`}>
           <label className="relative block">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text/35" size={18} />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Was brauchst du? z.B. Umzug, Fenster, Nachhilfe…" className="h-11 w-full rounded-2xl border border-secondary bg-background pl-11 pr-4 text-sm outline-none transition focus:border-primary/40" />
@@ -348,7 +364,7 @@ export default function ServiceSearchPage() {
           </SelectField>
         </div>
 
-        <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr_0.75fr_0.75fr_0.9fr]">
+        <div className={`${mobileFiltersOpen ? "mt-3 grid" : "hidden"} gap-3 md:mt-3 md:grid lg:grid-cols-[1fr_1fr_0.75fr_0.75fr_0.9fr]`}>
           <SelectField
             label="Kategorie"
             value={categoryId}
