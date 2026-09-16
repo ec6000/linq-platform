@@ -16,6 +16,9 @@ const ROLE_RESTRICTED_PATHS: Array<{ prefix: string; role: UserRole }> = [
   { prefix: "/profile", role: "provider" },
   { prefix: "/customer-dashboard", role: "customer" },
   { prefix: "/customer-profile", role: "customer" },
+  { prefix: "/my-orders", role: "customer" },
+  { prefix: "/find-services", role: "customer" },
+  { prefix: "/service-finden", role: "customer" },
 ]
 
 function pathMatchesPrefix(pathname: string, prefix: string) {
@@ -27,7 +30,7 @@ function getRequiredRole(pathname: string) {
 }
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { loading, user } = useAuth()
+  const { loading, user, error, logout } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const isPublicPath = PUBLIC_PATHS.has(pathname)
@@ -35,7 +38,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   const isWrongRole = Boolean(user && requiredRole && user.role !== requiredRole)
 
   useEffect(() => {
-    if (loading) {
+    if (loading || error) {
       return
     }
 
@@ -52,12 +55,31 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     if (user && requiredRole && user.role !== requiredRole) {
       router.replace(getHomeForRole(user.role))
     }
-  }, [isPublicPath, loading, pathname, requiredRole, router, user])
+  }, [error, isPublicPath, loading, pathname, requiredRole, router, user])
 
   if (loading) {
     return (
-      <main className="mx-auto flex min-h-[calc(100vh-64px)] max-w-[1600px] items-center justify-center px-6 py-10">
-        <p className="text-sm text-text/50">Session wird geladen…</p>
+      <main
+        id="main"
+        className="flex min-h-[calc(100vh-var(--nav-h))] items-center justify-center px-6 py-10"
+      >
+        <span className="flex items-center gap-2.5 text-[13px] text-text/40">
+          <span className="dot-live text-accent" aria-hidden />
+          Session wird geladen
+        </span>
+      </main>
+    )
+  }
+
+  if (error && !user) {
+    return (
+      <main id="main" className="mx-auto max-w-lg px-6 py-20 text-center">
+        <p role="alert" className="notice notice-error text-left">
+          {error}
+        </p>
+        <button type="button" className="btn btn-primary mt-5" onClick={() => void logout()}>
+          Neu anmelden
+        </button>
       </main>
     )
   }

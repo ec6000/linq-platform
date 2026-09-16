@@ -1,204 +1,155 @@
 "use client"
+
 import { useMemo, useState } from "react"
-import { Layers, Plus } from "lucide-react"
-import { useServices } from "@/lib/hooks/useServices"
+import { Plus } from "lucide-react"
+import { useMyServices } from "@/lib/hooks/useServices"
+import { createService, updateService, type ServiceInput } from "@/lib/data/services"
 import ServiceCard from "@/components/my-services/ServiceCard"
-import { Service, ServiceStatus } from "@/lib/types/service"
-import ServiceForm, { ServiceFormValues } from "@/components/my-services/ServiceForm"
-import { useAuth } from "@/components/auth/AuthProvider"
-import { createService } from "@/lib/hooks/useCreateService"
-import { editService } from "@/lib/hooks/useEditService"
+import ServiceForm from "@/components/my-services/ServiceForm"
+import PageHeader from "@/components/layout/PageHeader"
+import { ServiceStatus, type Service } from "@/lib/types/service"
 
-const SERVICES_PER_PAGE = 10
+type StatusFilter = "all" | ServiceStatus.active | ServiceStatus.paused
 
-type StatusFilter = "all" | ServiceStatus.active | ServiceStatus.inactive
+const filters = [
+  { key: "all", label: "Alle" },
+  { key: ServiceStatus.active, label: "Aktiv" },
+  { key: ServiceStatus.paused, label: "Pausiert" },
+] as const
 
 export default function ServicesPage() {
-  const { services, loading, error, reload } = useServices()
-  const { user } = useAuth()
+  const { services, loading, error } = useMyServices()
 
   const [activeFilter, setActiveFilter] = useState<StatusFilter>("all")
-  const [currentPage, setCurrentPage] = useState(1)
-
   const [formOpen, setFormOpen] = useState(false)
-  const [editingService, setEditingService] = useState<Service | null>(null)
+  const [editing, setEditing] = useState<Service | null>(null)
   const [saving, setSaving] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const filteredServices = useMemo(() => {
-    const withoutDeleted = services.filter((service) => service.status !== ServiceStatus.deleted)
-
-    if (activeFilter === "all") {
-      return withoutDeleted
-    }
-
-    return withoutDeleted.filter((service) => service.status === activeFilter)
-  }, [activeFilter, services])
-
-  const totalPages = Math.max(1, Math.ceil(filteredServices.length / SERVICES_PER_PAGE))
-  const paginatedServices = filteredServices.slice(
-    (currentPage - 1) * SERVICES_PER_PAGE,
-    currentPage * SERVICES_PER_PAGE,
+  const visible = useMemo(
+    () => (activeFilter === "all" ? services : services.filter((service) => service.status === activeFilter)),
+    [activeFilter, services],
   )
 
-  function openCreateForm() {
-    setEditingService(null)
+  function openCreate() {
+    setEditing(null)
     setSubmitError(null)
     setFormOpen(true)
   }
 
-  function openEditForm(service: Service) {
-    setEditingService(service)
+  function openEdit(service: Service) {
+    setEditing(service)
     setSubmitError(null)
     setFormOpen(true)
   }
 
   function closeForm() {
     setFormOpen(false)
-    setEditingService(null)
+    setEditing(null)
     setSubmitError(null)
   }
 
-  async function handleCreate(values: ServiceFormValues) {
-    if (!user?.numericId) {
-      setSubmitError("Deinem Profil fehlt noch die numerische User-ID. Bitte melde dich neu an oder speichere dein Profil erneut.")
-      return
-    }
-
+  async function handleSubmit(values: ServiceInput) {
     setSaving(true)
     setSubmitError(null)
-
     try {
-      await createService({
-        ...values,
-        providerId: user.numericId,
-        providerName: user.displayName || user.email,
-      })
-
-      await reload()
+      if (editing) {
+        await updateService(editing.id, values)
+      } else {
+        await createService(values)
+      }
       closeForm()
     } catch (err) {
       console.error(err)
-      setSubmitError("Service konnte nicht erstellt werden.")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleEdit(values: ServiceFormValues) {
-    if (!editingService) return
-
-    setSaving(true)
-    setSubmitError(null)
-
-    try {
-      await editService(editingService.id, values)
-      await reload()
-      closeForm()
-    } catch (err) {
-      console.error(err)
-      setSubmitError("Service konnte nicht aktualisiert werden.")
+      setSubmitError(err instanceof Error ? err.message : "Service konnte nicht gespeichert werden.")
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <main className="mx-auto max-w-[1600px] px-6 py-10">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
-        <div className="flex h-10 items-center gap-3">
-          <Layers size={22} className="text-primary" strokeWidth={1.8} />
-          <h1 className="text-[22px] font-semibold tracking-tight text-text">Meine Services</h1>
-        </div>
+    <main id="main" className="shell-wide py-10 md:py-12">
+      <PageHeader
+        title="Meine Services"
+        description="Was du anbietest, und wo Kunden dich finden."
+        count={visible.length}
+        actions={
+          <button type="button" onClick={openCreate} className="btn btn-primary">
+            <Plus size={16} strokeWidth={2} aria-hidden />
+            Service erstellen
+          </button>
+        }
+      />
 
-        <button
-          type="button"
-          onClick={openCreateForm}
-          className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition hover:opacity-90"
-        >
-          <Plus size={16} strokeWidth={2} />
-          Service erstellen
-        </button>
-      </div>
-
-      <div className="mb-5 flex flex-wrap items-center gap-2">
-        {([
-          { key: "all", label: "Alle" },
-          { key: ServiceStatus.active, label: "Aktiv" },
-          { key: ServiceStatus.inactive, label: "Inaktiv" },
-        ] as const).map((chip) => {
-          const selected = activeFilter === chip.key
-          return (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={() => {
-                setActiveFilter(chip.key)
-                setCurrentPage(1)
-              }}
-              className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${
-                selected
-                  ? "border-primary/30 bg-primary/10 text-primary"
-                  : "border-secondary text-text/65 hover:bg-secondary"
-              }`}
-            >
-              {chip.label}
-            </button>
-          )
-        })}
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        {filters.map((chip) => (
+          <button
+            key={chip.key}
+            type="button"
+            onClick={() => setActiveFilter(chip.key)}
+            data-active={activeFilter === chip.key ? "true" : "false"}
+            className="chip"
+          >
+            {chip.label}
+          </button>
+        ))}
       </div>
 
       {formOpen && (
         <div className="mb-6">
           <ServiceForm
-            mode={editingService ? "edit" : "create"}
-            initialService={editingService}
+            key={editing?.id ?? "new"}
+            mode={editing ? "edit" : "create"}
+            initialService={editing}
             saving={saving}
             onCancel={closeForm}
-            onSubmit={editingService ? handleEdit : handleCreate}
+            onSubmit={handleSubmit}
           />
-          {submitError && <p className="mt-2 text-sm text-red-500">{submitError}</p>}
+          {submitError && (
+            <p role="alert" className="notice notice-error mt-3">
+              {submitError}
+            </p>
+          )}
         </div>
       )}
 
-      {loading && <p className="text-sm text-text/40">Services werden geladen…</p>}
-      {error && <p className="text-sm text-red-500">{error}</p>}
-
-      {!loading && !error && filteredServices.length === 0 && (
-        <p className="text-sm text-text/40">Keine Services mit den gewählten Filtern gefunden.</p>
+      {loading && (
+        <div className="flex flex-col gap-4">
+          {[0, 1, 2].map((index) => (
+            <div key={index} className="skeleton h-40 rounded-xl" />
+          ))}
+        </div>
       )}
 
-      <div className="flex flex-col gap-3">
-        {paginatedServices.map((service) => (
-          <ServiceCard key={service.id} service={service} onEdit={openEditForm} />
+      {error && (
+        <p role="alert" className="notice notice-error">
+          {error}
+        </p>
+      )}
+
+      {!loading && !error && visible.length === 0 && (
+        <div className="empty">
+          <h2 className="text-[17px] font-semibold text-text">
+            {services.length === 0 ? "Noch keine Services" : "Keine Services mit diesem Filter"}
+          </h2>
+          <p className="mx-auto mt-2 max-w-sm text-[14px] leading-relaxed text-text/50">
+            {services.length === 0
+              ? "Lege deinen ersten Service an, damit Kunden dich in der Suche finden."
+              : "Wähle einen anderen Filter, um weitere Services zu sehen."}
+          </p>
+          {services.length === 0 && !formOpen && (
+            <button type="button" onClick={openCreate} className="btn btn-primary mt-7">
+              Ersten Service erstellen
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-4">
+        {visible.map((service) => (
+          <ServiceCard key={service.id} service={service} onEdit={openEdit} />
         ))}
       </div>
-
-      {!loading && !error && filteredServices.length > SERVICES_PER_PAGE && (
-        <div className="mt-6 flex items-center justify-between gap-3 text-sm text-text/70">
-          <p>
-            Seite {currentPage} von {totalPages}
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={currentPage === 1}
-              className="rounded-lg border border-secondary px-3 py-1.5 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Zurück
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              disabled={currentPage === totalPages}
-              className="rounded-lg border border-secondary px-3 py-1.5 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Weiter
-            </button>
-          </div>
-        </div>
-      )}
     </main>
   )
 }

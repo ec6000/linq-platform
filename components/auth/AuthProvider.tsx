@@ -19,12 +19,13 @@ import {
 } from "firebase/auth"
 import { auth, googleProvider } from "@/lib/firebase/firebase"
 import { AppUser, UserRole } from "@/lib/types/user"
-import { ensureUserProfile, getAppUser } from "@/lib/utils/auth"
+import { getAppUser } from "@/lib/utils/auth"
 
 interface AuthContextValue {
   firebaseUser: User | null
   user: AppUser | null
   loading: boolean
+  error: string | null
   signUpWithEmail: (params: {
     email: string
     password: string
@@ -42,11 +43,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null)
   const [user, setUser] = useState<AppUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const pendingGoogleRole = useRef<UserRole | null>(null)
+  const pendingName = useRef<string | undefined>(undefined)
 
   useEffect(() => {
+    let generation = 0
     const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
+      const current = ++generation
       setFirebaseUser(nextUser)
+      setUser(null)
+      setLoading(true)
+      setError(null)
 
       if (!nextUser) {
         setUser(null)
@@ -55,17 +63,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const appUser = await getAppUser(nextUser, pendingGoogleRole.current ?? "provider")
-        setUser(appUser)
+        const appUser = await getAppUser(nextUser, pendingGoogleRole.current ?? "provider", pendingName.current)
+        if (generation === current) setUser(appUser)
       } catch (error) {
         console.error(error)
-        setUser(null)
+        if (generation === current) {
+          setUser(null)
+          setError("Dein Profil konnte nicht geladen werden. Bitte melde dich erneut an.")
+        }
       } finally {
-        setLoading(false)
+        if (generation === current) setLoading(false)
       }
     })
 
-    return unsubscribe
+    return () => { generation++; unsubscribe() }
   }, [])
 
   const value = useMemo<AuthContextValue>(
@@ -73,22 +84,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       firebaseUser,
       user,
       loading,
+      error,
       signUpWithEmail: async ({ email, password, role, displayName }) => {
-        const credentials = await createUserWithEmailAndPassword(auth, email, password)
+        pendingGoogleRole.current = role
+        pendingName.current = displayName.trim()
+        try {
+          const credentials = await createUserWithEmailAndPassword(auth, email, password)
 
-        if (displayName.trim()) {
-          await updateProfile(credentials.user, { displayName: displayName.trim() })
+          if (displayName.trim()) {
+            await updateProfile(credentials.user, { displayName: displayName.trim() })
+          }
+
+          const appUser = await getAppUser(credentials.user, role, displayName.trim())
+          if (auth.currentUser?.uid === appUser.uid) setUser(appUser)
+          return appUser
+        } finally {
+          pendingGoogleRole.current = null
+          pendingName.current = undefined
         }
-
-        await ensureUserProfile(credentials.user, role)
-        const appUser = await getAppUser(credentials.user)
-        setUser(appUser)
-        return appUser
       },
       signInWithEmail: async (email, password) => {
         const credentials = await signInWithEmailAndPassword(auth, email, password)
         const appUser = await getAppUser(credentials.user)
-        setUser(appUser)
+        if (auth.currentUser?.uid === appUser.uid) setUser(appUser)
         return appUser
       },
       signInWithGoogle: async (role = "provider") => {
@@ -96,9 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         try {
           const credentials = await signInWithPopup(auth, googleProvider)
-          await ensureUserProfile(credentials.user, role)
           const appUser = await getAppUser(credentials.user, role)
-          setUser(appUser)
+          if (auth.currentUser?.uid === appUser.uid) setUser(appUser)
           return appUser
         } finally {
           pendingGoogleRole.current = null
@@ -109,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null)
       },
     }),
-    [firebaseUser, user, loading],
+    [firebaseUser, user, loading, error],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

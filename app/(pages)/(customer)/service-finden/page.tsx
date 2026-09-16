@@ -1,5 +1,6 @@
-import ServiceSearchPage from "@/components/customer/ServiceSearchPage"
+import { redirect } from "next/navigation"
 
+/** Legacy German URL. The page itself lives at /find-services. */
 export default function Page() {
-  return <ServiceSearchPage />
+  redirect("/find-services")
 }

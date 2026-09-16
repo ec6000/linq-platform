@@ -1,34 +1,42 @@
 "use client"
 
 import Link from "next/link"
-import { ProviderOffer } from "@/lib/hooks/useProviderOffers"
+import { ArrowRight } from "lucide-react"
+import { OFFER_STATUS_LABEL, OfferStatus, type Offer } from "@/lib/types/offer"
+import { formatEuro } from "@/lib/utils/format"
 
-const statusLabel: Record<string, string> = {
-  pending: "Offen",
-  accepted: "Angenommen",
-  declined: "Abgelehnt",
+const statusStyles: Record<OfferStatus, string> = {
+  [OfferStatus.pending]: "pill-accent",
+  [OfferStatus.accepted]: "pill-success",
+  [OfferStatus.declined]: "pill-muted",
 }
 
-const statusStyles: Record<string, string> = {
-  pending: "bg-accent/10 text-accent",
-  accepted: "bg-primary/10 text-primary",
-  declined: "bg-secondary text-text/50",
-}
-
-export default function OfferCard({ offer }: { offer: ProviderOffer }) {
+export default function OfferCard({ offer }: { offer: Offer }) {
   return (
-    <article className="rounded-2xl border border-secondary bg-background p-5 transition hover:border-primary/30 hover:shadow-sm">
+    <article className="card card-interactive p-6">
       <div className="mb-3 flex items-start justify-between gap-3">
-        <h2 className="text-[16px] font-semibold text-text">{offer.orderTitle || "Auftrag"}</h2>
-        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${statusStyles[offer.status] ?? statusStyles.pending}`}>
-          {statusLabel[offer.status] ?? offer.status}
+        <h2 className="text-[16px] font-semibold leading-snug text-text">{offer.orderTitle}</h2>
+        <span className={`pill ${statusStyles[offer.status] ?? "pill-muted"}`}>
+          {OFFER_STATUS_LABEL[offer.status] ?? offer.status}
         </span>
       </div>
-      <p className="text-[22px] font-semibold tracking-tight text-text mb-3">{(offer.priceInCent / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</p>
-      {offer.comment && <p className="mb-4 line-clamp-2 text-[13px] leading-relaxed text-text/65">{offer.comment}</p>}
-      <div className="flex items-center justify-end">
-        <Link href={`/find-jobs/${offer.orderId}`} className="rounded-lg border border-secondary px-3 py-1.5 text-[12px] font-medium text-text/70 transition hover:bg-secondary">
+
+      <p className="num text-[22px] font-semibold text-text">{formatEuro(offer.priceInCent)} €</p>
+
+      {offer.message && (
+        <p className="mt-3 line-clamp-2 text-[13.5px] leading-relaxed text-text/60">{offer.message}</p>
+      )}
+
+      {offer.customerComment && (
+        <p className="card-sunken mt-4 px-3.5 py-2.5 text-[13px] text-text/65">
+          Rückmeldung: {offer.customerComment}
+        </p>
+      )}
+
+      <div className="mt-6 flex items-center justify-end border-t border-secondary pt-5">
+        <Link href={`/find-jobs/${offer.orderId}`} className="link-arrow text-[13px]">
           Auftrag öffnen
+          <ArrowRight size={14} strokeWidth={2.2} aria-hidden />
         </Link>
       </div>
     </article>

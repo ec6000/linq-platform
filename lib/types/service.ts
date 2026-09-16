@@ -1,10 +1,12 @@
-import { Timestamp, GeoPoint } from "firebase/firestore"
+import type { Timestamp } from "firebase/firestore"
+import type { DocumentMeta, Place, Pricing } from "./common"
 
-export interface Service {
-  id: number
-  firestoreId: string
+/** What a provider offers. Flow A starts here: a customer books it. */
+export interface Service extends DocumentMeta {
+  /** Firestore document ID — the only identity this service has. */
+  id: string
 
-  providerId: number
+  providerId: string
   providerName: string
 
   title: string
@@ -13,33 +15,33 @@ export interface Service {
 
   status: ServiceStatus
 
-  pricingType: PricingType
-  minBudgetInCent: number
-  maxBudgetInCent: number
-  unitName?: string
+  pricing: Pricing
+  minPriceInCent: number
+  maxPriceInCent: number
 
-  location: GeoPoint
-  radius: number
-  city?: string
+  place: Place
+  /** How far the provider travels, in kilometres. */
+  radiusKm: number
 
   categoryId: string
-  categoryName?: string
+  categoryName: string
   subcategoryId?: string
   subcategoryName?: string
-  bookingIds?: number[]
 
-  createdAt: Timestamp
-  updatedAt: Timestamp
+  archivedAt?: Timestamp
 }
 
 export enum ServiceStatus {
+  /** Visible in search, bookable. */
   active = "active",
-  inactive = "inactive",
-  deleted = "deleted",
+  /** Hidden from search, kept by the provider. */
+  paused = "paused",
+  /** Soft-deleted. Never shown, never bookable. */
+  archived = "archived",
 }
 
-export enum PricingType {
-  fixed = "Gesamt",
-  perHour = "/ Stunde",
-  perUnit = "pro Einheit"
+export const SERVICE_STATUS_LABEL: Record<ServiceStatus, string> = {
+  [ServiceStatus.active]: "Aktiv",
+  [ServiceStatus.paused]: "Pausiert",
+  [ServiceStatus.archived]: "Archiviert",
 }

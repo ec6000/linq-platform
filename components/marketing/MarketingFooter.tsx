@@ -1,11 +1,5 @@
 import Link from "next/link";
-import { Expletus_Sans } from "next/font/google";
-
-const expletus = Expletus_Sans({
-  subsets: ["latin"],
-  weight: ["700"],
-  display: "swap",
-});
+import Logo from "@/components/brand/Logo";
 
 const columns = [
   {
@@ -18,93 +12,50 @@ const columns = [
     ],
   },
   {
-    title: "Unternehmen",
+    title: "Konto",
     links: [
-      { label: "Über uns", href: "/ueber-uns" },
-      { label: "Karriere", href: "/karriere" },
-      { label: "Kontakt", href: "/kontakt" },
-      { label: "Blog", href: "/blog" },
-    ],
-  },
-  {
-    title: "Rechtliches",
-    links: [
-      { label: "Impressum", href: "/impressum" },
-      { label: "Datenschutz", href: "/datenschutz" },
-      { label: "AGB", href: "/agb" },
-      { label: "Cookies", href: "/cookies" },
+      { label: "Anmelden", href: "/login" },
+      { label: "Registrieren", href: "/signup" },
     ],
   },
 ];
 
 export default function MarketingFooter() {
   return (
-    <footer
-      className="mt-10"
-      style={{ borderTop: "1px solid var(--secondary)" }}
-    >
-      <div className="mx-auto max-w-[1280px] px-6 md:px-10 py-14 md:py-20">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-10 md:gap-16">
+    <footer className="border-t border-secondary">
+      <div className="shell py-16 md:py-20">
+        <div className="grid grid-cols-2 gap-10 md:grid-cols-4 md:gap-16">
           <div className="col-span-2 flex flex-col gap-4">
-            <Link
-              href="/"
-              className="inline-flex"
-              style={{ color: "var(--primary)" }}
-            >
-              <span className={`${expletus.className} text-[26px] tracking-wide leading-none`}>
-                LiNQ.
-              </span>
+            <Link href="/" className="inline-flex self-start" aria-label="LiNQ Startseite">
+              <Logo size="sm" />
             </Link>
-            <p
-              className="max-w-xs text-[14px] leading-relaxed"
-              style={{ color: "var(--text)", opacity: 0.6 }}
-            >
-              Die Plattform für lokale Dienstleistungen – entwickelt für Köln, gebaut für
-              den Alltag.
+            <p className="max-w-xs text-[14px] leading-relaxed text-text/55">
+              Die Plattform für lokale Dienstleistungen – entwickelt für Köln, gebaut für den
+              Alltag.
             </p>
           </div>
 
-          {columns.map((col) => (
-            <div key={col.title} className="flex flex-col gap-3">
-              <h3
-                className="text-[12px] font-semibold uppercase tracking-[0.12em]"
-                style={{ color: "var(--primary)" }}
-              >
-                {col.title}
-              </h3>
-              <ul className="flex flex-col gap-2">
-                {col.links.map((link) => (
+          {columns.map((column) => (
+            <nav key={column.title} className="flex flex-col gap-3.5" aria-label={column.title}>
+              <h2 className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-text/40">
+                {column.title}
+              </h2>
+              <ul className="flex flex-col gap-2.5">
+                {column.links.map((link) => (
                   <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="text-[14px] transition-opacity duration-150 hover:opacity-100"
-                      style={{ color: "var(--text)", opacity: 0.65 }}
-                    >
+                    <Link href={link.href} className="link-quiet text-[14px]">
                       {link.label}
                     </Link>
                   </li>
                 ))}
               </ul>
-            </div>
+            </nav>
           ))}
         </div>
 
-        <div
-          className="mt-14 pt-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
-          style={{ borderTop: "1px solid var(--secondary)" }}
-        >
-          <p
-            className="text-[13px]"
-            style={{ color: "var(--text)", opacity: 0.5 }}
-          >
-            © {new Date().getFullYear()} LiNQ. Alle Rechte vorbehalten. Made in Köln.
-          </p>
-          <p
-            className="text-[13px]"
-            style={{ color: "var(--text)", opacity: 0.5 }}
-          >
-            Deutsch (Deutschland)
-          </p>
+        <div className="mt-16 flex flex-col items-start justify-between gap-3 border-t border-secondary pt-8 text-[13px] text-text/45 md:flex-row md:items-center">
+          <p>© {new Date().getFullYear()} LiNQ. Alle Rechte vorbehalten. Made in Köln.</p>
+          <p>Deutsch (Deutschland)</p>
         </div>
       </div>
     </footer>

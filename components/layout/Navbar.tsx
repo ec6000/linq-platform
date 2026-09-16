@@ -2,27 +2,20 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   Bell,
   ClipboardList,
   LayoutDashboard,
+  LogOut,
+  Menu,
   Search,
   Wrench,
-  Menu,
   X,
-  LogOut,
 } from "lucide-react";
-import { useState } from "react";
-import "@/app/globals.css";
-import { Expletus_Sans } from "next/font/google";
+import Logo from "@/components/brand/Logo";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getHomeForRole, getProfileForRole } from "@/lib/utils/auth";
-
-const expletus = Expletus_Sans({
-  subsets: ["latin"],
-  weight: ["700"],
-  display: "swap",
-});
 
 interface NavbarProps {
   userRole?: "provider" | "customer";
@@ -51,109 +44,63 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
   const profileHref = getProfileForRole(userRole);
   const homeHref = getHomeForRole(userRole);
 
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
   const handleLogout = async () => {
     await logout();
     router.replace("/login");
   };
 
   return (
-    <header
-      className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur"
-      style={{ borderBottom: "1px solid var(--secondary)" }}
-    >
-      <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-6 md:px-10">
-        <Link
-          href={homeHref}
-          className="text-[22px] font-bold tracking-tight"
-          style={{ color: "var(--primary)" }}
-        >
-          <span className={`${expletus.className} text-3xl tracking-wide`}>LiNQ.</span>
+    <header className="sticky top-0 z-40 w-full border-b border-secondary bg-background/80 backdrop-blur-xl backdrop-saturate-150">
+      <div className="shell-wide flex h-16 items-center justify-between">
+        <Link href={homeHref} className="-m-2 p-2" aria-label="Zur Startseite">
+          <Logo size="sm" />
         </Link>
 
-        <nav className="hidden md:flex items-center gap-1">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-[14px] font-medium transition-all duration-150"
-                style={{
-                  color: isActive ? "var(--primary)" : "var(--text)",
-                  opacity: isActive ? 1 : 0.5,
-                  background: isActive ? "color-mix(in srgb, var(--primary) 8%, transparent)" : "transparent",
-                }}
-                onMouseEnter={e => {
-                  if (!isActive) {
-                    (e.currentTarget as HTMLElement).style.opacity = "0.85";
-                    (e.currentTarget as HTMLElement).style.background = "var(--secondary)";
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!isActive) {
-                    (e.currentTarget as HTMLElement).style.opacity = "0.5";
-                    (e.currentTarget as HTMLElement).style.background = "transparent";
-                  }
-                }}
-              >
-                <Icon size={15} strokeWidth={2} />
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="hidden items-center gap-1 md:flex" aria-label="Hauptnavigation">
+          {navItems.map(({ label, href, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className="nav-link"
+              data-active={isActive(href) ? "true" : "false"}
+              aria-current={isActive(href) ? "page" : undefined}
+            >
+              <Icon size={15} strokeWidth={2} aria-hidden />
+              {label}
+            </Link>
+          ))}
         </nav>
 
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            className="relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-150"
-            style={{ color: "var(--text)", opacity: 0.5 }}
-            aria-label="Benachrichtigungen"
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.opacity = "1";
-              (e.currentTarget as HTMLElement).style.background = "var(--secondary)";
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.opacity = "0.5";
-              (e.currentTarget as HTMLElement).style.background = "transparent";
-            }}
-          >
-            <Bell size={18} strokeWidth={1.9} />
+          <button type="button" className="icon-btn" aria-label="Benachrichtigungen">
+            <Bell size={18} strokeWidth={1.8} aria-hidden />
             <span
-              className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full"
-              style={{ background: "var(--accent)" }}
+              className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent"
+              aria-hidden
             />
           </button>
 
           <button
             type="button"
             onClick={handleLogout}
-            className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-150"
-            style={{ color: "var(--text)", opacity: 0.55 }}
-            aria-label="Logout"
+            className="icon-btn hidden md:inline-flex"
+            aria-label="Abmelden"
           >
-            <LogOut size={17} strokeWidth={1.9} />
+            <LogOut size={17} strokeWidth={1.8} aria-hidden />
           </button>
 
-          <Link
-            href={profileHref}
-            className="hidden md:flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-semibold ml-1 transition-all duration-150"
-            style={{
-              background: "color-mix(in srgb, var(--primary) 12%, transparent)",
-              color: "var(--primary)",
-            }}
-            aria-label="Profil"
-          >
+          <Link href={profileHref} className="avatar ml-1 hidden md:inline-flex" aria-label="Profil">
             {avatarLetter}
           </Link>
 
           <button
             type="button"
-            className="flex md:hidden h-9 w-9 items-center justify-center rounded-lg transition-all duration-150"
-            style={{ color: "var(--text)", opacity: 0.6 }}
-            aria-label="Menü"
-            onClick={() => setMenuOpen(!menuOpen)}
+            className="icon-btn md:hidden"
+            aria-label={menuOpen ? "Menü schließen" : "Menü öffnen"}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
           >
             {menuOpen ? <X size={18} strokeWidth={2} /> : <Menu size={18} strokeWidth={2} />}
           </button>
@@ -161,60 +108,39 @@ export default function Navbar({ userRole = "provider", userName = "E" }: Navbar
       </div>
 
       {menuOpen && (
-        <div
-          className="md:hidden px-4 py-3 flex flex-col gap-0.5"
-          style={{ borderTop: "1px solid var(--secondary)" }}
-        >
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-            const Icon = item.icon;
-            return (
+        <div className="border-t border-secondary bg-background md:hidden">
+          <div className="shell-wide flex flex-col gap-0.5 py-3">
+            {navItems.map(({ label, href, icon: Icon }) => (
               <Link
-                key={item.href}
-                href={item.href}
+                key={href}
+                href={href}
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] font-medium transition-all duration-150"
-                style={{
-                  color: isActive ? "var(--primary)" : "var(--text)",
-                  opacity: isActive ? 1 : 0.55,
-                  background: isActive ? "color-mix(in srgb, var(--primary) 8%, transparent)" : "transparent",
-                }}
+                data-active={isActive(href) ? "true" : "false"}
+                className="flex items-center gap-3 rounded-sm px-3 py-3 text-[14.5px] font-medium text-text/60 transition-colors hover:bg-muted data-[active=true]:bg-primary/6 data-[active=true]:text-primary"
               >
-                <Icon size={16} strokeWidth={1.9} />
-                {item.label}
+                <Icon size={16} strokeWidth={1.9} aria-hidden />
+                {label}
               </Link>
-            );
-          })}
+            ))}
 
-          <Link
-            href={profileHref}
-            onClick={() => setMenuOpen(false)}
-            className="flex items-center gap-3 px-3 py-3 mt-2"
-            style={{ borderTop: "1px solid var(--secondary)" }}
-          >
-            <div
-              className="h-8 w-8 rounded-full flex items-center justify-center text-[13px] font-semibold"
-              style={{
-                background: "color-mix(in srgb, var(--primary) 12%, transparent)",
-                color: "var(--primary)",
-              }}
+            <Link
+              href={profileHref}
+              onClick={() => setMenuOpen(false)}
+              className="mt-2 flex items-center gap-3 border-t border-secondary px-3 pb-2 pt-4"
             >
-              {avatarLetter}
-            </div>
-            <span className="text-[14px] font-medium" style={{ color: "var(--text)", opacity: 0.7 }}>
-              {userName}
-            </span>
-          </Link>
+              <span className="avatar">{avatarLetter}</span>
+              <span className="truncate text-[14px] font-medium text-text/70">{userName}</span>
+            </Link>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] font-medium text-text/70"
-            style={{ borderTop: "1px solid var(--secondary)" }}
-          >
-            <LogOut size={16} strokeWidth={1.9} />
-            Logout
-          </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex items-center gap-3 rounded-sm px-3 py-3 text-[14.5px] font-medium text-text/60 transition-colors hover:bg-muted"
+            >
+              <LogOut size={16} strokeWidth={1.9} aria-hidden />
+              Abmelden
+            </button>
+          </div>
         </div>
       )}
     </header>

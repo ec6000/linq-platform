@@ -1,11 +1,10 @@
-const SITE_URL = "https://linq.de";
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "http://localhost:3000";
 
 export const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "Organization",
   name: "LiNQ",
   url: SITE_URL,
-  logo: `${SITE_URL}/logo.png`,
   description:
     "LiNQ ist eine Plattform für lokale Dienstleistungen in Köln. Kunden finden passende Dienstleister, Dienstleister finden lokale Aufträge.",
   address: {
@@ -23,11 +22,7 @@ export const websiteSchema = {
   name: "LiNQ",
   url: SITE_URL,
   inLanguage: "de-DE",
-  potentialAction: {
-    "@type": "SearchAction",
-    target: `${SITE_URL}/suche?q={search_term_string}`,
-    "query-input": "required name=search_term_string",
-  },
+
 };
 
 export const localBusinessSchema = {
@@ -48,5 +43,4 @@ export const localBusinessSchema = {
     addressCountry: "DE",
   },
   priceRange: "€€",
-  image: `${SITE_URL}/og-image.png`,
 };

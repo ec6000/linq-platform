@@ -48,59 +48,69 @@ export default function LoginPage() {
 
   return (
     <AuthCard
-      title="Login"
+      title="Willkommen zurück"
       subtitle="Melde dich an, um LiNQ zu nutzen."
       footerText="Noch kein Konto?"
-      footerLinkText="Sign up"
+      footerLinkText="Jetzt registrieren"
       footerHref="/signup"
     >
-      <form onSubmit={handleEmailLogin} className="space-y-3">
-        <label className="flex flex-col gap-1 text-sm text-text/70">
-          E-Mail
+      <form onSubmit={handleEmailLogin} className="flex flex-col gap-4">
+        <div>
+          <label className="field-label" htmlFor="login-email">
+            E-Mail
+          </label>
           <input
+            id="login-email"
             type="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] outline-none transition focus:border-primary/40"
+            className="field field-h"
           />
-        </label>
+        </div>
 
-        <label className="flex flex-col gap-1 text-sm text-text/70">
-          Passwort
+        <div>
+          <label className="field-label" htmlFor="login-password">
+            Passwort
+          </label>
           <input
+            id="login-password"
             type="password"
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] outline-none transition focus:border-primary/40"
+            className="field field-h"
           />
-        </label>
+        </div>
 
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && (
+          <p role="alert" className="notice notice-error">
+            {error}
+          </p>
+        )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
-        >
-          Einloggen
+        <button type="submit" disabled={loading} className="btn btn-primary btn-lg btn-block mt-1">
+          {loading ? "Anmelden…" : "Einloggen"}
         </button>
       </form>
 
-      <div className="my-4 flex items-center gap-2">
-        <div className="h-px flex-1 bg-secondary" />
-        <span className="text-xs uppercase text-text/45">oder</span>
-        <div className="h-px flex-1 bg-secondary" />
+      <div className="my-6 flex items-center gap-3">
+        <span className="hairline flex-1" />
+        <span className="text-[11.5px] font-medium uppercase tracking-[0.14em] text-text/35">
+          oder
+        </span>
+        <span className="hairline flex-1" />
       </div>
 
       <button
         type="button"
         onClick={handleGoogleLogin}
         disabled={loading}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-secondary px-4 py-2.5 text-sm font-medium text-text transition hover:bg-secondary/40 disabled:opacity-50"
+        className="btn btn-outline btn-lg btn-block"
       >
-        <Chrome size={16} />
+        <Chrome size={16} strokeWidth={1.9} aria-hidden />
         Mit Google anmelden
       </button>
     </AuthCard>

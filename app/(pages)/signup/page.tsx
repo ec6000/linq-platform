@@ -2,11 +2,24 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Chrome } from "lucide-react"
+import { Check, Chrome } from "lucide-react"
 import AuthCard from "@/components/auth/AuthCard"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { UserRole } from "@/lib/types/user"
 import { getHomeForRole } from "@/lib/utils/auth"
+
+const roleOptions = [
+  {
+    value: "customer" as const,
+    title: "Kunde",
+    description: "Aufträge erstellen und passende Dienstleister finden.",
+  },
+  {
+    value: "provider" as const,
+    title: "Dienstleister",
+    description: "Services anbieten und neue Aufträge annehmen.",
+  },
+]
 
 export default function SignUpPage() {
   const router = useRouter()
@@ -57,71 +70,70 @@ export default function SignUpPage() {
 
   return (
     <AuthCard
-      title="Sign up"
-      subtitle="Erstelle dein Konto als Kunde oder Provider und starte direkt."
+      title="Konto erstellen"
+      subtitle="Starte als Kunde oder Dienstleister – in unter einer Minute."
       footerText="Schon registriert?"
-      footerLinkText="Login"
+      footerLinkText="Anmelden"
       footerHref="/login"
     >
-      <form onSubmit={handleSignUp} className="space-y-3">
-        <label className="flex flex-col gap-1 text-sm text-text/70">
-          Name
+      <form onSubmit={handleSignUp} className="flex flex-col gap-4">
+        <div>
+          <label className="field-label" htmlFor="signup-name">
+            Name
+          </label>
           <input
+            id="signup-name"
+            autoComplete="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] outline-none transition focus:border-primary/40"
+            className="field field-h"
           />
-        </label>
+        </div>
 
-        <label className="flex flex-col gap-1 text-sm text-text/70">
-          E-Mail
+        <div>
+          <label className="field-label" htmlFor="signup-email">
+            E-Mail
+          </label>
           <input
+            id="signup-email"
             type="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] outline-none transition focus:border-primary/40"
+            className="field field-h"
           />
-        </label>
+        </div>
 
-        <label className="flex flex-col gap-1 text-sm text-text/70">
-          Passwort
+        <div>
+          <label className="field-label" htmlFor="signup-password">
+            Passwort
+          </label>
           <input
+            id="signup-password"
             type="password"
+            autoComplete="new-password"
             minLength={6}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="rounded-xl border border-secondary px-3 py-2.5 text-[14px] outline-none transition focus:border-primary/40"
+            className="field field-h"
           />
-        </label>
+          <p className="field-hint mt-1.5">Mindestens 6 Zeichen.</p>
+        </div>
 
-        <fieldset className="space-y-2">
-          <legend className="text-sm text-text/70">Registrieren als</legend>
+        <fieldset className="mt-1">
+          <legend className="field-label">Registrieren als</legend>
           <div className="grid gap-2 sm:grid-cols-2">
-            {[
-              {
-                value: "customer" as const,
-                title: "Kunde",
-                description: "Aufträge erstellen und passende Provider finden.",
-              },
-              {
-                value: "provider" as const,
-                title: "Provider",
-                description: "Services anbieten und Jobs annehmen.",
-              },
-            ].map((option) => {
+            {roleOptions.map((option) => {
               const selected = role === option.value
 
               return (
                 <label
                   key={option.value}
-                  className={`cursor-pointer rounded-xl border p-3 transition ${
-                    selected
-                      ? "border-primary bg-primary/5 text-text"
-                      : "border-secondary text-text/65 hover:bg-secondary/30"
-                  }`}
+                  data-selected={selected ? "true" : "false"}
+                  className="relative cursor-pointer rounded-md border border-secondary p-3.5 transition-all duration-150 hover:border-text/20 data-[selected=true]:border-primary data-[selected=true]:bg-primary/4"
                 >
                   <input
                     type="radio"
@@ -131,43 +143,50 @@ export default function SignUpPage() {
                     onChange={(e) => setRole(e.target.value as UserRole)}
                     className="sr-only"
                   />
-                  <span className="block text-sm font-medium">{option.title}</span>
-                  <span className="mt-1 block text-xs leading-5 text-text/55">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-[14px] font-semibold text-text">{option.title}</span>
+                    {selected && (
+                      <Check size={14} strokeWidth={2.6} className="text-primary" aria-hidden />
+                    )}
+                  </span>
+                  <span className="mt-1 block text-[12.5px] leading-relaxed text-text/55">
                     {option.description}
                   </span>
                 </label>
               )
             })}
           </div>
-          <p className="text-xs text-text/45">
+          <p className="field-hint mt-2">
             Diese Auswahl gilt auch, wenn du dich mit Google registrierst.
           </p>
         </fieldset>
 
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && (
+          <p role="alert" className="notice notice-error">
+            {error}
+          </p>
+        )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
-        >
-          Konto erstellen
+        <button type="submit" disabled={loading} className="btn btn-primary btn-lg btn-block mt-1">
+          {loading ? "Konto wird erstellt…" : "Konto erstellen"}
         </button>
       </form>
 
-      <div className="my-4 flex items-center gap-2">
-        <div className="h-px flex-1 bg-secondary" />
-        <span className="text-xs uppercase text-text/45">oder</span>
-        <div className="h-px flex-1 bg-secondary" />
+      <div className="my-6 flex items-center gap-3">
+        <span className="hairline flex-1" />
+        <span className="text-[11.5px] font-medium uppercase tracking-[0.14em] text-text/35">
+          oder
+        </span>
+        <span className="hairline flex-1" />
       </div>
 
       <button
         type="button"
         onClick={handleGoogleSignUp}
         disabled={loading}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-secondary px-4 py-2.5 text-sm font-medium text-text transition hover:bg-secondary/40 disabled:opacity-50"
+        className="btn btn-outline btn-lg btn-block"
       >
-        <Chrome size={16} />
+        <Chrome size={16} strokeWidth={1.9} aria-hidden />
         Mit Google registrieren
       </button>
     </AuthCard>

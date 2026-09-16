@@ -2,158 +2,264 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useMemo, useState } from "react"
-import { ArrowLeft, BadgeCheck, CalendarClock, CheckCircle2, Euro, Loader2, MapPin, MessageSquare, ShieldCheck, Star } from "lucide-react"
-import { useAuth } from "@/components/auth/AuthProvider"
-import { createBooking } from "@/lib/hooks/useCreateBooking"
-import { useCategories } from "@/lib/hooks/useCategory"
-import { useServices } from "@/lib/hooks/useServices"
-import { PricingType } from "@/lib/types/service"
+import { useState } from "react"
+import {
+  ArrowLeft,
+  BadgeCheck,
+  CalendarClock,
+  CheckCircle2,
+  Euro,
+  ImageIcon,
+  Loader2,
+  MapPin,
+  MessageSquare,
+  ShieldCheck,
+} from "lucide-react"
+import { useService } from "@/lib/hooks/useServices"
+import { useCreateBooking } from "@/lib/hooks/useBookings"
+import { formatEuro, formatPriceRange } from "@/lib/utils/format"
 
-interface ServiceDetailPageProps {
-  serviceId: number
-}
+export default function ServiceDetailPage({ serviceId }: { serviceId: string }) {
+  const { service, loading, error } = useService(serviceId)
+  const { submit, loading: saving, error: submitError } = useCreateBooking()
 
-function formatBudget(minBudgetInCent: number, maxBudgetInCent: number, pricingType: PricingType, unitName?: string) {
-  const min = (minBudgetInCent / 100).toLocaleString("de-DE", { maximumFractionDigits: 0 })
-  const max = (maxBudgetInCent / 100).toLocaleString("de-DE", { maximumFractionDigits: 0 })
-  const suffix = pricingType === PricingType.perHour ? " / Std." : pricingType === PricingType.perUnit && unitName ? ` / ${unitName}` : ""
-
-  return `${min}-${max} €${suffix}`
-}
-
-export default function ServiceDetailPage({ serviceId }: ServiceDetailPageProps) {
-  const { user } = useAuth()
-  const { services, loading, error } = useServices()
-  const { categories } = useCategories()
   const [message, setMessage] = useState("")
   const [requestedDateText, setRequestedDateText] = useState("")
   const [addressText, setAddressText] = useState("")
   const [priceInput, setPriceInput] = useState("")
-  const [saving, setSaving] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-  const [createdBookingId, setCreatedBookingId] = useState<number | null>(null)
-
-  const service = useMemo(() => services.find((item) => item.id === serviceId), [serviceId, services])
-  const categoryName = useMemo(() => {
-    if (!service) return "Kategorie"
-    return service.categoryName || categories.find((category) => category.id === service.categoryId)?.nameDE || "Kategorie"
-  }, [categories, service])
+  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-
     if (!service) return
-    if (!user?.numericId) {
-      setSubmitError("Deinem Kundenprofil fehlt noch die numerische User-ID. Bitte melde dich neu an oder speichere dein Profil erneut.")
+    setValidationError(null)
+
+    const trimmed = priceInput.trim()
+    const priceInCent = trimmed ? Math.round(Number(trimmed.replace(",", ".")) * 100) : undefined
+    if (priceInCent !== undefined && (!Number.isFinite(priceInCent) || priceInCent <= 0)) {
+      setValidationError("Bitte gib einen gültigen Preisvorschlag ein oder lasse das Feld leer.")
       return
     }
 
-    const proposedPriceInCent = priceInput.trim()
-      ? Math.round(Number(priceInput.replace(",", ".")) * 100)
-      : undefined
+    const bookingId = await submit({
+      serviceId: service.id,
+      message,
+      requestedDateText,
+      priceInCent,
+      place: addressText.trim() ? { address: addressText.trim() } : undefined,
+    })
 
-    if (proposedPriceInCent !== undefined && (!Number.isFinite(proposedPriceInCent) || proposedPriceInCent <= 0)) {
-      setSubmitError("Bitte gib einen gültigen Preisvorschlag ein oder lasse das Feld leer.")
-      return
-    }
-
-    setSaving(true)
-    setSubmitError(null)
-
-    try {
-      const bookingId = await createBooking({
-        serviceId: service.id,
-        providerId: service.providerId,
-        customerId: user.numericId,
-        serviceTitle: service.title,
-        categoryId: service.categoryId,
-        pricingType: service.pricingType,
-        priceInCent: proposedPriceInCent,
-        unitName: service.unitName,
-        message,
-        requestedDateText,
-        addressText,
-        city: service.city,
-      })
+    if (bookingId) {
       setCreatedBookingId(bookingId)
       setMessage("")
       setRequestedDateText("")
       setAddressText("")
       setPriceInput("")
-    } catch (err) {
-      console.error(err)
-      setSubmitError("Anfrage konnte nicht gesendet werden. Bitte versuche es erneut.")
-    } finally {
-      setSaving(false)
     }
   }
 
   if (loading) {
-    return <main className="mx-auto max-w-[1200px] px-6 py-10 text-sm text-text/50">Service wird geladen…</main>
+    return (
+      <main id="main" className="shell-wide py-10">
+        <div className="grid gap-6 lg:grid-cols-[1.5fr_0.8fr]">
+          <div className="skeleton h-[560px] rounded-xl" />
+          <div className="skeleton h-[480px] rounded-xl" />
+        </div>
+      </main>
+    )
   }
 
   if (error || !service) {
-    return <main className="mx-auto max-w-[1200px] px-6 py-10"><Link href="/find-services" className="inline-flex items-center gap-2 text-sm text-primary"><ArrowLeft size={16} /> Zur Suche</Link><div className="mt-6 rounded-3xl border border-secondary p-8"><h1 className="text-xl font-semibold text-text">Service nicht gefunden</h1><p className="mt-2 text-sm text-text/55">Der Service ist nicht mehr verfügbar oder wurde entfernt.</p></div></main>
+    return (
+      <main id="main" className="shell-wide py-10">
+        <Link href="/find-services" className="link-quiet mb-8 inline-flex items-center gap-1.5 text-[13.5px]">
+          <ArrowLeft size={14} strokeWidth={2} aria-hidden />
+          Zur Suche
+        </Link>
+        <div className="empty">
+          <h1 className="text-[17px] font-semibold text-text">Service nicht gefunden</h1>
+          <p className="mx-auto mt-2 max-w-sm text-[14px] leading-relaxed text-text/50">
+            Der Service ist nicht mehr verfügbar oder wurde entfernt.
+          </p>
+          <Link href="/find-services" className="btn btn-outline mt-7">
+            Zurück zur Suche
+          </Link>
+        </div>
+      </main>
+    )
   }
 
-  return (
-    <main className="mx-auto max-w-[1400px] px-6 py-8 md:px-10">
-      <Link href="/find-services" className="fixed left-4 top-20 z-30 inline-flex items-center gap-2 rounded-full border border-secondary bg-background/95 px-4 py-2 text-sm font-medium text-text/70 shadow-sm backdrop-blur transition hover:bg-secondary hover:text-text md:left-8"><ArrowLeft size={16} /> Zurück</Link>
+  const facts = [
+    {
+      label: "Preisrahmen",
+      value: formatPriceRange(service.minPriceInCent, service.maxPriceInCent, service.pricing),
+    },
+    { label: "Ort", value: service.place.city },
+    { label: "Einsatzradius", value: `${service.radiusKm} km` },
+  ]
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
-        <section className="overflow-hidden rounded-[2rem] border border-secondary bg-background">
-          <div className="relative h-[340px] bg-secondary md:h-[440px]">
-            {service.imageUrl ? <Image src={service.imageUrl} alt={service.title} fill priority sizes="(min-width: 1024px) 60vw, 100vw" className="object-cover" /> : <div className="flex h-full items-center justify-center text-text/35">Kein Bild vorhanden</div>}
+  return (
+    <main id="main" className="shell-wide py-8 md:py-10">
+      <Link href="/find-services" className="link-quiet mb-6 inline-flex items-center gap-1.5 text-[13.5px]">
+        <ArrowLeft size={14} strokeWidth={2} aria-hidden />
+        Zur Suche
+      </Link>
+
+      <div className="grid gap-6 lg:grid-cols-[1.5fr_0.8fr]">
+        <section className="card overflow-hidden">
+          <div className="relative h-[300px] bg-muted md:h-[420px]">
+            {service.imageUrl ? (
+              <Image
+                src={service.imageUrl}
+                alt={service.title}
+                fill
+                priority
+                sizes="(min-width: 1024px) 62vw, 100vw"
+                className="object-cover"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-text/20">
+                <ImageIcon size={32} strokeWidth={1.4} aria-hidden />
+              </div>
+            )}
           </div>
 
-          <div className="p-6 md:p-8">
+          <div className="p-6 md:p-9">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">{categoryName}</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-3 py-1 text-sm font-medium text-accent"><Star size={14} className="fill-accent" /> 4,9 Bewertung</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-sm font-medium text-text/60"><ShieldCheck size={14} /> geprüfter Anbieter</span>
+              <span className="pill pill-primary">{service.categoryName}</span>
+              {service.subcategoryName && (
+                <span className="pill pill-muted">{service.subcategoryName}</span>
+              )}
+              <span className="pill pill-accent">
+                <ShieldCheck size={12} strokeWidth={2} aria-hidden />
+                Geprüfter Anbieter
+              </span>
             </div>
 
-            <h1 className="mt-5 text-3xl font-semibold tracking-tight text-text md:text-5xl">{service.title}</h1>
-            <p className="mt-4 max-w-3xl whitespace-pre-line text-[15px] leading-7 text-text/65">{service.description}</p>
+            <h1 className="display mt-6 text-[32px] text-primary md:text-[44px]">{service.title}</h1>
+            <p className="mt-5 max-w-3xl whitespace-pre-line text-[15.5px] leading-[1.7] text-text/65">
+              {service.description}
+            </p>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-secondary p-4"><p className="text-xs uppercase tracking-wide text-text/40">Preisrahmen</p><p className="mt-1 text-xl font-semibold text-text">{formatBudget(service.minBudgetInCent, service.maxBudgetInCent, service.pricingType, service.unitName)}</p></div>
-              <div className="rounded-2xl border border-secondary p-4"><p className="text-xs uppercase tracking-wide text-text/40">Ort</p><p className="mt-1 flex items-center gap-2 text-lg font-semibold text-text"><MapPin size={18} /> {service.city || "Nach Absprache"}</p></div>
-              <div className="rounded-2xl border border-secondary p-4"><p className="text-xs uppercase tracking-wide text-text/40">Radius</p><p className="mt-1 text-lg font-semibold text-text">{service.radius} km</p></div>
-            </div>
+            <dl className="mt-9 grid gap-px overflow-hidden rounded-lg border border-secondary bg-secondary sm:grid-cols-3">
+              {facts.map((fact) => (
+                <div key={fact.label} className="bg-background p-5">
+                  <dt className="text-[11.5px] font-semibold uppercase tracking-[0.12em] text-text/40">
+                    {fact.label}
+                  </dt>
+                  <dd className="num mt-1.5 text-[17px] font-semibold text-text">{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
 
-            <div className="mt-8 rounded-3xl bg-secondary/60 p-5">
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-text"><BadgeCheck className="text-primary" /> Anbieter</h2>
-              <p className="mt-2 text-text/70">{service.providerName}</p>
-              <div className="mt-4 grid gap-2 text-sm text-text/60 sm:grid-cols-3"><span>✓ Identität geprüft</span><span>✓ Transparenter Preisrahmen</span><span>✓ Anfrage unverbindlich</span></div>
+            <div className="card-sunken mt-6 p-6">
+              <h2 className="flex items-center gap-2 text-[16px] font-semibold text-text">
+                <BadgeCheck size={17} strokeWidth={1.9} className="text-accent-ink" aria-hidden />
+                Anbieter
+              </h2>
+              <p className="mt-2 text-[15px] text-text/70">{service.providerName}</p>
+              <ul className="mt-5 grid gap-2 text-[13.5px] text-text/55 sm:grid-cols-3">
+                <li>Identität geprüft</li>
+                <li>Transparenter Preisrahmen</li>
+                <li>Anfrage unverbindlich</li>
+              </ul>
             </div>
           </div>
         </section>
 
-        <aside className="lg:sticky lg:top-24 lg:self-start">
-          <form onSubmit={handleSubmit} className="rounded-[2rem] border border-secondary bg-background p-5 shadow-sm md:p-6">
-            <h2 className="text-xl font-semibold text-text">Service anfragen</h2>
-            <p className="mt-1 text-sm leading-6 text-text/55">Sende eine unverbindliche Anfrage. Der Anbieter erhält Service-, Kunden- und Booking-ID als numerische Referenzen.</p>
+        <aside className="lg:sticky lg:top-[calc(var(--nav-h)+24px)] lg:self-start">
+          <form onSubmit={handleSubmit} className="card bg-background p-6 shadow-sm md:p-7">
+            <h2 className="text-[19px] font-semibold text-text">Service anfragen</h2>
+            <p className="mt-1.5 text-[13.5px] leading-relaxed text-text/55">
+              Unverbindlich und kostenlos. Der Anbieter meldet sich direkt bei dir.
+            </p>
 
-            {createdBookingId && <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/10 p-4 text-sm text-primary"><CheckCircle2 className="mb-2" size={18} /> Anfrage gesendet. Booking-ID: #{createdBookingId}</div>}
+            {createdBookingId && (
+              <p className="notice notice-success mt-5 flex items-center gap-2">
+                <CheckCircle2 size={16} strokeWidth={2} aria-hidden />
+                Anfrage gesendet. Der Anbieter antwortet dir in Kürze.
+              </p>
+            )}
 
-            <label className="mt-5 block text-sm font-medium text-text/75">Wunschtermin</label>
-            <div className="relative mt-2"><CalendarClock className="absolute left-4 top-1/2 -translate-y-1/2 text-text/35" size={17} /><input value={requestedDateText} onChange={(event) => setRequestedDateText(event.target.value)} placeholder="z.B. Freitagvormittag oder flexibel" className="h-12 w-full rounded-2xl border border-secondary bg-background pl-11 pr-4 text-sm outline-none focus:border-primary/40" /></div>
+            <div className="mt-6 flex flex-col gap-4">
+              <div>
+                <label className="field-label" htmlFor="booking-date">
+                  Wunschtermin
+                </label>
+                <div className="field-group field-h">
+                  <CalendarClock size={15} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
+                  <input
+                    id="booking-date"
+                    value={requestedDateText}
+                    onChange={(event) => setRequestedDateText(event.target.value)}
+                    placeholder="z. B. Freitagvormittag oder flexibel"
+                  />
+                </div>
+              </div>
 
-            <label className="mt-4 block text-sm font-medium text-text/75">Adresse / Einsatzort</label>
-            <div className="relative mt-2"><MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-text/35" size={17} /><input value={addressText} onChange={(event) => setAddressText(event.target.value)} placeholder={service.city || "Wo soll der Service stattfinden?"} className="h-12 w-full rounded-2xl border border-secondary bg-background pl-11 pr-4 text-sm outline-none focus:border-primary/40" /></div>
+              <div>
+                <label className="field-label" htmlFor="booking-address">
+                  Adresse / Einsatzort
+                </label>
+                <div className="field-group field-h">
+                  <MapPin size={15} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
+                  <input
+                    id="booking-address"
+                    value={addressText}
+                    onChange={(event) => setAddressText(event.target.value)}
+                    placeholder={service.place.city}
+                  />
+                </div>
+              </div>
 
-            <label className="mt-4 block text-sm font-medium text-text/75">Dein Preisvorschlag (€)</label>
-            <div className="relative mt-2"><Euro className="absolute left-4 top-1/2 -translate-y-1/2 text-text/35" size={17} /><input value={priceInput} onChange={(event) => setPriceInput(event.target.value)} inputMode="decimal" placeholder={`Optional, z.B. ${(service.minBudgetInCent / 100).toLocaleString("de-DE")}`} className="h-12 w-full rounded-2xl border border-secondary bg-background pl-11 pr-4 text-sm outline-none focus:border-primary/40" /></div>
+              <div>
+                <label className="field-label" htmlFor="booking-price">
+                  Dein Preisvorschlag <span className="font-normal text-text/40">(optional)</span>
+                </label>
+                <div className="field-group field-h">
+                  <Euro size={15} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
+                  <input
+                    id="booking-price"
+                    value={priceInput}
+                    onChange={(event) => setPriceInput(event.target.value)}
+                    inputMode="decimal"
+                    placeholder={formatEuro(service.minPriceInCent, { decimals: false })}
+                    className="num"
+                  />
+                </div>
+              </div>
 
-            <label className="mt-4 block text-sm font-medium text-text/75">Nachricht</label>
-            <div className="relative mt-2"><MessageSquare className="absolute left-4 top-4 text-text/35" size={17} /><textarea value={message} onChange={(event) => setMessage(event.target.value)} required rows={5} placeholder="Beschreibe kurz, was du brauchst…" className="w-full resize-none rounded-2xl border border-secondary bg-background py-3 pl-11 pr-4 text-sm leading-6 outline-none focus:border-primary/40" /></div>
+              <div>
+                <label className="field-label" htmlFor="booking-message">
+                  Nachricht
+                </label>
+                <div className="field-group items-start">
+                  <MessageSquare size={15} strokeWidth={1.8} className="mt-1 flex-none text-text/30" aria-hidden />
+                  <textarea
+                    id="booking-message"
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                    required
+                    rows={5}
+                    placeholder="Beschreibe kurz, was du brauchst…"
+                    className="resize-none leading-relaxed"
+                  />
+                </div>
+              </div>
+            </div>
 
-            {submitError && <p className="mt-3 text-sm text-red-500">{submitError}</p>}
+            {(validationError || submitError) && (
+              <p role="alert" className="notice notice-error mt-5">
+                {validationError ?? submitError}
+              </p>
+            )}
 
-            <button type="submit" disabled={saving} className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{saving && <Loader2 className="animate-spin" size={16} />} Anfrage senden</button>
-            <p className="mt-3 text-center text-xs text-text/40">Kostenlos und unverbindlich</p>
+            <button type="submit" disabled={saving} className="btn btn-primary btn-lg btn-block mt-6">
+              {saving && <Loader2 className="animate-spin" size={16} aria-hidden />}
+              Anfrage senden
+            </button>
+            <p className="mt-3 text-center text-[12px] text-text/40">Kostenlos und unverbindlich</p>
           </form>
         </aside>
       </div>

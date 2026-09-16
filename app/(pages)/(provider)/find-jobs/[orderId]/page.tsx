@@ -2,198 +2,170 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useState } from "react"
 import { useParams } from "next/navigation"
 import { ArrowLeft, CalendarDays, CircleDollarSign, MapPin, UserRound } from "lucide-react"
 import OfferModal from "@/components/find-jobs/OfferModal"
 import ConfirmationModal from "@/components/ConfirmationModal"
-import { useCategories } from "@/lib/hooks/useCategory"
-import { useMyOffer } from "@/lib/hooks/useMyOffer"
-import { useOrders } from "@/lib/hooks/useOrders"
-import { Order, OrderStatus } from "@/lib/types/order"
-import { findCategoryByOrderValue } from "@/lib/utils/categoryMatching"
+import { useOrder } from "@/lib/hooks/useOrders"
+import { useMyOffer, useOfferActions } from "@/lib/hooks/useOffers"
+import { ORDER_STATUS_LABEL, OrderStatus } from "@/lib/types/order"
+import { OFFER_STATUS_LABEL, OfferStatus } from "@/lib/types/offer"
+import { formatEuro, formatTimeRange } from "@/lib/utils/format"
+import { parseDocumentId } from "@/lib/utils/validation"
 
 const statusStyles: Record<OrderStatus, string> = {
-  [OrderStatus.available]: "bg-accent/10 text-accent",
-  [OrderStatus.assigned]: "bg-secondary text-text/40",
-  [OrderStatus.inProgress]: "bg-primary/10 text-primary",
-  [OrderStatus.completed]: "bg-secondary text-text/40",
-  [OrderStatus.cancelled]: "bg-secondary text-text/40",
+  [OrderStatus.open]: "pill-accent",
+  [OrderStatus.assigned]: "pill-primary",
+  [OrderStatus.inProgress]: "pill-primary",
+  [OrderStatus.completed]: "pill-success",
+  [OrderStatus.cancelled]: "pill-muted",
 }
 
-const statusLabel: Record<OrderStatus, string> = {
-  [OrderStatus.available]: "Verfügbar",
-  [OrderStatus.assigned]: "Vergeben",
-  [OrderStatus.inProgress]: "In Arbeit",
-  [OrderStatus.completed]: "Abgeschlossen",
-  [OrderStatus.cancelled]: "Storniert",
-}
-
-function normalize(value?: string) {
-  return value?.trim().toLowerCase()
-}
-
-function formatDateTimeRange(order: Order) {
-  const start = order.timeWindow.start.toDate()
-  const end = order.timeWindow.end.toDate()
-
-  const day = start.toLocaleDateString("de-DE", {
-    weekday: "long",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
-  const startTime = start.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
-  const endTime = end.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
-
-  return `${day} · ${startTime}–${endTime}`
+function BackLink() {
+  return (
+    <Link href="/find-jobs" className="link-quiet mb-7 inline-flex items-center gap-1.5 text-[13.5px]">
+      <ArrowLeft size={14} strokeWidth={2} aria-hidden />
+      Zurück zur Übersicht
+    </Link>
+  )
 }
 
 export default function DetailedOrderPage() {
   const params = useParams<{ orderId: string }>()
-  const orderId = Number(params.orderId)
+  const orderId = parseDocumentId(params.orderId)
 
-  const { orders, loading, error } = useOrders()
-  const { categories } = useCategories()
+  const { order, loading, error } = useOrder(orderId ?? undefined)
+  const { offer, loading: offerLoading } = useMyOffer(orderId ?? undefined)
+  const { retractOffer, loading: retracting, error: offerError } = useOfferActions()
+
   const [modalOpen, setModalOpen] = useState(false)
   const [withdrawConfirmOpen, setWithdrawConfirmOpen] = useState(false)
 
-  const order = useMemo(() => orders.find((item) => item.id === orderId), [orders, orderId])
-  const { offer, deleting, withdrawOffer } = useMyOffer(orderId)
-
-  const category = findCategoryByOrderValue(categories, order?.categoryId)
-  const subcategory = category?.subcategories.find((item) => {
-    if (!order?.subcategoryId) {
-      return false
-    }
-
-    const target = normalize(order.subcategoryId)
-    return target === normalize(item.id) || target === normalize(item.nameDE)
-  })
-
-  useEffect(() => {
-    if (!order) {
-      return
-    }
-
-    console.info("[order-detail][category-debug]", {
-      orderId: order.id,
-      orderCategoryId: order.categoryId,
-      orderSubcategoryId: order.subcategoryId,
-      resolvedCategory: category
-        ? { id: category.id, firestoreId: category.firestoreId, nameDE: category.nameDE }
-        : null,
-      resolvedSubcategory: subcategory ? { id: subcategory.id, nameDE: subcategory.nameDE } : null,
-      categoriesLoaded: categories.length,
-    })
-  }, [categories.length, category, order, subcategory])
-
   if (loading) {
-    return <main className="mx-auto max-w-[1100px] px-6 py-10 text-sm text-text/40">Auftrag wird geladen…</main>
+    return (
+      <main id="main" className="mx-auto max-w-[1100px] px-6 py-10 md:px-10">
+        <div className="skeleton h-[560px] rounded-xl" />
+      </main>
+    )
   }
 
-  if (error) {
-    return <main className="mx-auto max-w-[1100px] px-6 py-10 text-sm text-red-500">{error}</main>
+  if (error || !order) {
+    return (
+      <main id="main" className="mx-auto max-w-[1100px] px-6 py-10 md:px-10">
+        <BackLink />
+        <div className="empty">
+          <h1 className="text-[17px] font-semibold text-text">
+            {error ? "Auftrag konnte nicht geladen werden" : "Auftrag nicht gefunden"}
+          </h1>
+          <p className="mx-auto mt-2 max-w-sm text-[14px] leading-relaxed text-text/50">
+            {error ?? "Der Auftrag ist nicht mehr verfügbar oder wurde entfernt."}
+          </p>
+          <Link href="/find-jobs" className="btn btn-outline mt-7">
+            Zurück zur Übersicht
+          </Link>
+        </div>
+      </main>
+    )
   }
 
-  if (!order) {
-    return <main className="mx-auto max-w-[1100px] px-6 py-10 text-sm text-text/40">Auftrag nicht gefunden.</main>
-  }
+  const canBid = order.status === OrderStatus.open && !offerLoading
 
-  const isAvailable = order.status === OrderStatus.available
+  const facts = [
+    {
+      icon: CalendarDays,
+      label: "Zeitfenster",
+      value: formatTimeRange(order.timeWindow.start, order.timeWindow.end) ?? "Nach Absprache",
+      hint: order.timeWindow.isFlexible ? "Zeitpunkt ist flexibel." : undefined,
+    },
+    {
+      icon: MapPin,
+      label: "Ort & Radius",
+      value: order.place.address,
+      hint: `Suchradius: ${order.radiusKm} km`,
+    },
+    { icon: UserRound, label: "Kunde", value: order.customerName },
+    {
+      icon: CircleDollarSign,
+      label: "Dein Angebot",
+      value: offer ? `${formatEuro(offer.priceInCent)} €` : "Noch kein Angebot gesendet.",
+      hint: offer ? OFFER_STATUS_LABEL[offer.status] : undefined,
+    },
+  ]
 
   return (
-    <main className="mx-auto max-w-[1100px] px-6 py-10">
-      <Link
-        href="/find-jobs"
-        className="mb-6 inline-flex items-center gap-1 text-[13px] font-medium text-text/60 transition hover:text-text"
-      >
-        <ArrowLeft size={14} />
-        Zurück zur Übersicht
-      </Link>
+    <main id="main" className="mx-auto max-w-[1100px] px-6 py-10 md:px-10">
+      <BackLink />
 
-      <section className="rounded-2xl border border-secondary bg-background p-5 sm:p-7">
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-[24px] font-semibold text-text">{order.title}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-text/60">
-              <span className={`rounded-full px-3 py-1 text-[12px] font-medium ${statusStyles[order.status]}`}>
-                {statusLabel[order.status]}
+      {offerError && (
+        <p role="alert" className="notice notice-error mb-5">
+          {offerError}
+        </p>
+      )}
+
+      <section className="card bg-background p-6 md:p-9">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="display text-[28px] text-primary md:text-[36px]">{order.title}</h1>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className={`pill ${statusStyles[order.status]}`}>
+                {ORDER_STATUS_LABEL[order.status]}
               </span>
-              {category && (
-                <span className="rounded-full border border-secondary px-3 py-1 text-[12px]">
-                  {category.nameDE}{subcategory ? ` · ${subcategory.nameDE}` : ""}
+              <span className="pill pill-outline">
+                {order.categoryName}
+                {order.subcategoryName ? ` · ${order.subcategoryName}` : ""}
+              </span>
+              {order.offerCount > 0 && (
+                <span className="pill pill-muted num">
+                  {order.offerCount} {order.offerCount === 1 ? "Angebot" : "Angebote"}
                 </span>
               )}
             </div>
           </div>
 
-          <div className="rounded-xl bg-primary/5 px-4 py-3 text-right">
-            <p className="text-[12px] text-text/60">Budget</p>
-            <p className="text-[20px] font-semibold text-text">
-              {(order.budgetInCent / 100).toLocaleString("de-DE")}€
+          <div className="card-sunken flex-none px-5 py-4 sm:text-right">
+            <p className="text-[11.5px] font-semibold uppercase tracking-[0.12em] text-text/40">
+              Budget
+            </p>
+            <p className="num mt-1 text-[24px] font-semibold text-text">
+              {formatEuro(order.budgetInCent, { decimals: false })} €
             </p>
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-secondary p-4">
-            <p className="mb-1 flex items-center gap-1.5 text-[12px] font-medium uppercase tracking-wide text-text/45">
-              <CalendarDays size={14} />
-              Zeitfenster
-            </p>
-            <p className="text-[14px] text-text">{formatDateTimeRange(order)}</p>
-            {order.timeWindow.isFlexible && (
-              <p className="mt-1 text-[12px] text-text/50">Zeitpunkt ist flexibel.</p>
-            )}
-          </div>
+        <dl className="mt-9 grid gap-px overflow-hidden rounded-lg border border-secondary bg-secondary sm:grid-cols-2">
+          {facts.map(({ icon: Icon, label, value, hint }) => (
+            <div key={label} className="bg-background p-5">
+              <dt className="flex items-center gap-2 text-[11.5px] font-semibold uppercase tracking-[0.12em] text-text/40">
+                <Icon size={13} strokeWidth={2} aria-hidden />
+                {label}
+              </dt>
+              <dd className="mt-2 text-[14px] text-text">{value}</dd>
+              {hint && <p className="mt-1 text-[12.5px] text-text/45">{hint}</p>}
+            </div>
+          ))}
+        </dl>
 
-          <div className="rounded-xl border border-secondary p-4">
-            <p className="mb-1 flex items-center gap-1.5 text-[12px] font-medium uppercase tracking-wide text-text/45">
-              <MapPin size={14} />
-              Ort & Radius
-            </p>
-            <p className="text-[14px] text-text">{order.address ?? "Adresse folgt nach Kontaktaufnahme"}</p>
-            <p className="mt-1 text-[12px] text-text/50">
-              Suchradius: {Math.round(order.radiusInMeters / 1000)} km
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-secondary p-4">
-            <p className="mb-1 flex items-center gap-1.5 text-[12px] font-medium uppercase tracking-wide text-text/45">
-              <UserRound size={14} />
-              Kunde
-            </p>
-            <p className="text-[14px] text-text">{order.customerName}</p>
-          </div>
-
-          <div className="rounded-xl border border-secondary p-4">
-            <p className="mb-1 flex items-center gap-1.5 text-[12px] font-medium uppercase tracking-wide text-text/45">
-              <CircleDollarSign size={14} />
-              Dein Angebot
-            </p>
-            {!offer && <p className="text-[14px] text-text/70">Noch kein Angebot gesendet.</p>}
-            {offer && (
-              <p className="text-[14px] text-text">
-                {(offer.priceInCent / 100).toLocaleString("de-DE")}€
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="my-6 border-t border-secondary" />
-
-        <div>
-          <h2 className="mb-2 text-[14px] font-medium text-text">Auftragsbeschreibung</h2>
-          <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-text/80">{order.description}</p>
+        <div className="mt-9">
+          <h2 className="text-[11.5px] font-semibold uppercase tracking-[0.12em] text-text/40">
+            Auftragsbeschreibung
+          </h2>
+          <p className="mt-3 whitespace-pre-wrap text-[15px] leading-[1.7] text-text/75">
+            {order.description}
+          </p>
         </div>
 
         {order.imageUrls.length > 0 && (
-          <div className="mt-6">
-            <h2 className="mb-2 text-[14px] font-medium text-text">Bilder</h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-9">
+            <h2 className="text-[11.5px] font-semibold uppercase tracking-[0.12em] text-text/40">
+              Bilder
+            </h2>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {order.imageUrls.map((url) => (
-                <div key={url} className="relative h-44 w-full overflow-hidden rounded-xl border border-secondary">
+                <div
+                  key={url}
+                  className="relative h-44 w-full overflow-hidden rounded-md border border-secondary bg-muted"
+                >
                   <Image
                     src={url}
                     alt={`Bild zu ${order.title}`}
@@ -207,28 +179,30 @@ export default function DetailedOrderPage() {
           </div>
         )}
 
-        <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
-          {isAvailable && !offer && (
-            <button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              className="rounded-xl bg-primary px-4 py-2 text-[13px] font-medium text-white transition hover:bg-primary/90"
-            >
-              Angebot senden
-            </button>
-          )}
-
-          {isAvailable && offer && (
-            <button
-              type="button"
-              disabled={deleting}
-              onClick={() => setWithdrawConfirmOpen(true)}
-              className="rounded-xl border border-red-200 px-4 py-2 text-[13px] font-medium text-red-400 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
-            >
-              {deleting ? "…" : "Angebot zurückziehen"}
-            </button>
-          )}
-        </div>
+        {canBid && (
+          <div className="mt-9 flex flex-wrap items-center justify-end gap-2 border-t border-secondary pt-6">
+            {offer && offer.status === OfferStatus.pending ? (
+              <button
+                type="button"
+                disabled={retracting}
+                onClick={() => setWithdrawConfirmOpen(true)}
+                className="btn btn-danger"
+              >
+                Angebot zurückziehen
+              </button>
+            ) : (
+              !offer && (
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(true)}
+                  className="btn btn-primary btn-lg"
+                >
+                  Angebot senden
+                </button>
+              )
+            )}
+          </div>
+        )}
       </section>
 
       <ConfirmationModal
@@ -236,11 +210,11 @@ export default function DetailedOrderPage() {
         title="Angebot wirklich zurückziehen?"
         description="Danach ist dein Preisangebot für diesen Auftrag nicht mehr aktiv."
         confirmLabel="Ja, zurückziehen"
-        loading={deleting}
+        destructive
+        loading={retracting}
         onCancel={() => setWithdrawConfirmOpen(false)}
         onConfirm={async () => {
-          await withdrawOffer()
-          setWithdrawConfirmOpen(false)
+          if (await retractOffer(order.id)) setWithdrawConfirmOpen(false)
         }}
       />
 

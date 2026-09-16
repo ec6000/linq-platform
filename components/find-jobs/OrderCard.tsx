@@ -2,88 +2,79 @@
 
 import Link from "next/link"
 import { ArrowRight, CalendarDays, MapPin } from "lucide-react"
-import { Order, OrderStatus } from "@/lib/types/order"
+import { ORDER_STATUS_LABEL, OrderStatus, type Order } from "@/lib/types/order"
+import { formatEuro, formatTimeRange } from "@/lib/utils/format"
 
 const statusStyles: Record<OrderStatus, string> = {
-  [OrderStatus.available]: "bg-accent/10 text-accent",
-  [OrderStatus.assigned]: "bg-secondary text-text/40",
-  [OrderStatus.inProgress]: "bg-primary/10 text-primary",
-  [OrderStatus.completed]: "bg-secondary text-text/40",
-  [OrderStatus.cancelled]: "bg-secondary text-text/40",
-}
-
-const statusLabel: Record<OrderStatus, string> = {
-  [OrderStatus.available]: "Verfügbar",
-  [OrderStatus.assigned]: "Vergeben",
-  [OrderStatus.inProgress]: "In Arbeit",
-  [OrderStatus.completed]: "Abgeschlossen",
-  [OrderStatus.cancelled]: "Storniert",
+  [OrderStatus.open]: "pill-accent",
+  [OrderStatus.assigned]: "pill-primary",
+  [OrderStatus.inProgress]: "pill-primary",
+  [OrderStatus.completed]: "pill-success",
+  [OrderStatus.cancelled]: "pill-muted",
 }
 
 interface OrderCardProps {
   order: Order
-  matchingScore?: number
-  categoryName?: string
+  /** How well the order matched the current filters, 0–100. */
+  matchScore?: number
+  /** Distance from the searched location, in kilometres. */
+  distanceKm?: number | null
 }
 
-function formatTimeWindow(order: Order) {
-  const start = order.timeWindow.start.toDate()
-  const end = order.timeWindow.end.toDate()
-
-  const day = start.toLocaleDateString("de-DE")
-  const startTime = start.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
-  const endTime = end.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
-
-  return `${day} · ${startTime}–${endTime}`
-}
-
-export default function OrderCard({ order, matchingScore, categoryName }: OrderCardProps) {
-  const budget = (order.budgetInCent / 100).toLocaleString("de-DE")
-  const resolvedCategoryLabel = categoryName ?? `ID: ${order.categoryId}`
+export default function OrderCard({ order, matchScore, distanceKm }: OrderCardProps) {
+  const when = formatTimeRange(order.timeWindow.start, order.timeWindow.end)
 
   return (
-    <article className="rounded-2xl border border-secondary bg-background px-4 py-4 transition hover:border-primary/30 hover:shadow-sm sm:px-6 sm:py-5">
+    <article className="card card-interactive p-5 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-2">
+        <div className="min-w-0 space-y-2.5">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-[15px] font-medium leading-snug text-text">{order.title}</h2>
-            <span className="rounded-full border border-secondary px-3 py-1 text-[12px] text-text/70">
-              {resolvedCategoryLabel}
-            </span>
-            {typeof matchingScore === "number" && (
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-[12px] font-medium text-primary">
-                Score: {matchingScore}
-              </span>
-            )}
-            <span className={`rounded-full px-3 py-1 text-[12px] font-medium ${statusStyles[order.status]}`}>
-              {statusLabel[order.status]}
+            <h2 className="text-[15.5px] font-semibold leading-snug text-text">{order.title}</h2>
+            <span className={`pill ${statusStyles[order.status]}`}>
+              {ORDER_STATUS_LABEL[order.status]}
             </span>
           </div>
 
-          <div className="space-y-1 text-[13px] text-text/60">
-            <p className="flex items-center gap-1.5">
-              <CalendarDays size={14} className="text-text/40" />
-              {formatTimeWindow(order)}
-              {order.timeWindow.isFlexible && <span className="text-[12px] text-text/40">(flexibel)</span>}
-            </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="pill pill-outline">{order.categoryName}</span>
+            {order.subcategoryName && <span className="pill pill-muted">{order.subcategoryName}</span>}
+            {typeof matchScore === "number" && (
+              <span className="pill pill-primary num">Match {matchScore}</span>
+            )}
+          </div>
 
-            {order.address && (
-              <p className="flex items-center gap-1.5 truncate">
-                <MapPin size={14} className="shrink-0 text-text/40" />
-                <span className="truncate">{order.address}</span>
+          <div className="space-y-1.5 text-[13px] text-text/60">
+            {when && (
+              <p className="flex items-center gap-2">
+                <CalendarDays size={14} strokeWidth={1.8} className="flex-none text-text/35" aria-hidden />
+                {when}
+                {order.timeWindow.isFlexible && <span className="text-text/35">(flexibel)</span>}
               </p>
             )}
+            <p className="flex items-center gap-2">
+              <MapPin size={14} strokeWidth={1.8} className="flex-none text-text/35" aria-hidden />
+              <span className="truncate">{order.place.address}</span>
+              {typeof distanceKm === "number" && (
+                <span className="num flex-none text-text/40">· {distanceKm.toFixed(1)} km</span>
+              )}
+            </p>
           </div>
         </div>
 
-        <div className="flex flex-col items-start gap-2 sm:items-end">
-          <span className="text-[15px] font-semibold text-text">{budget}€</span>
-          <Link
-            href={`/find-jobs/${order.id}`}
-            className="inline-flex items-center gap-1 rounded-xl border border-secondary px-3 py-1.5 text-[13px] font-medium text-text/70 transition hover:border-primary/30 hover:text-text"
-          >
+        <div className="flex shrink-0 items-center justify-between gap-4 sm:flex-col sm:items-end sm:gap-3">
+          <div className="sm:text-right">
+            <span className="num text-[19px] font-semibold text-text">
+              {formatEuro(order.budgetInCent, { decimals: false })} €
+            </span>
+            {order.offerCount > 0 && (
+              <p className="num text-[12px] text-text/45">
+                {order.offerCount} {order.offerCount === 1 ? "Angebot" : "Angebote"}
+              </p>
+            )}
+          </div>
+          <Link href={`/find-jobs/${order.id}`} className="btn btn-outline btn-sm">
             Details
-            <ArrowRight size={14} />
+            <ArrowRight size={14} strokeWidth={2.2} aria-hidden />
           </Link>
         </div>
       </div>

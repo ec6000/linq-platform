@@ -1,43 +1,44 @@
-import { Timestamp, GeoPoint } from "firebase/firestore"
-import { PricingType } from "./service"
+import type { Timestamp } from "firebase/firestore"
+import type { DocumentMeta, Place, Pricing } from "./common"
 
-export interface Booking {
-  id: number
-  firestoreId: string
+/**
+ * A customer's request against a published service.
+ *
+ * Flow A: service → booking → job. The snapshot fields freeze what the service
+ * looked like when it was requested, so a later edit cannot rewrite history.
+ */
+export interface Booking extends DocumentMeta {
+  /** Firestore document ID — the only identity this booking has. */
+  id: string
 
-  // 🔗 Referenzen
-  serviceId: number
-  providerId: number
-  customerId: number
-
-  // 📄 Mini-Snapshot vom Service (zum Zeitpunkt der Anfrage)
+  serviceId: string
   serviceTitle: string
+
+  customerId: string
+  customerName: string
+  providerId: string
+  providerName: string
+
   categoryId: string
-  pricingType: PricingType
+  categoryName: string
+
+  pricing: Pricing
+  /** What the customer proposes to pay. Absent means "ask the provider". */
   priceInCent?: number
-  unitName?: string
 
-  // 📝 Anfrage vom Kunden
-  message?: string
-  requestedDateText?: string
-  requestedAt?: Timestamp
+  /** The customer's message and preferred date, as free text. */
+  message: string
+  requestedDateText: string
 
-  // Antwort Dienstleister
+  place: Place
+
+  status: BookingStatus
+  /** Why the provider said no. */
   declineMessage?: string
 
-  // 📍 Ort (kann vom Service abweichen)
-  location?: GeoPoint
-  addressText?: string
+  /** Set once the booking turned into a job. */
+  jobId?: string
 
-  // 🔄 Status
-  status: BookingStatus
-
-  // 🔗 Wenn daraus ein Job wird
-  jobId?: number
-
-  // 🧾 Meta
-  createdAt: Timestamp
-  updatedAt: Timestamp
   acceptedAt?: Timestamp
   declinedAt?: Timestamp
   cancelledAt?: Timestamp
@@ -48,4 +49,11 @@ export enum BookingStatus {
   accepted = "accepted",
   declined = "declined",
   cancelled = "cancelled",
+}
+
+export const BOOKING_STATUS_LABEL: Record<BookingStatus, string> = {
+  [BookingStatus.requested]: "Angefragt",
+  [BookingStatus.accepted]: "Angenommen",
+  [BookingStatus.declined]: "Abgelehnt",
+  [BookingStatus.cancelled]: "Storniert",
 }

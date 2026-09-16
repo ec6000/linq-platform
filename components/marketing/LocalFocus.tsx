@@ -1,4 +1,5 @@
 import { MapPin } from "lucide-react";
+import Reveal from "@/components/motion/Reveal";
 import SectionHeading from "./SectionHeading";
 
 const districts = [
@@ -18,78 +19,46 @@ const districts = [
 
 export default function LocalFocus() {
   return (
-    <section
-      id="lokal-koeln"
-      aria-labelledby="local-heading"
-      className="py-20 md:py-28 relative overflow-hidden"
-      style={{
-        background: "color-mix(in srgb, var(--primary) 4%, transparent)",
-      }}
-    >
-      <div className="mx-auto max-w-[1280px] px-6 md:px-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
-          <div className="lg:col-span-6">
+    <section id="lokal-koeln" aria-labelledby="local-heading" className="band section">
+      <div className="shell">
+        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-16">
+          <Reveal className="lg:col-span-6">
             <SectionHeading
+              id="local-heading"
               eyebrow="Lokal in Köln"
               title="Gebaut für Köln. Und für alles, was Köln braucht."
-              description={
-                <>
-                  LiNQ startet dort, wo wir selbst zuhause sind: in Köln. Von Ehrenfeld
-                  über Sülz bis Mülheim – unsere Plattform konzentriert sich bewusst auf
-                  das lokale Umfeld, damit Wege kurz, Anfahrten schnell und die
-                  Verbindungen echt bleiben.
-                </>
-              }
+              description="LiNQ startet dort, wo wir selbst zuhause sind. Von Ehrenfeld über Sülz bis Mülheim konzentriert sich die Plattform bewusst auf das lokale Umfeld – damit Wege kurz und die Verbindungen echt bleiben."
             />
 
-            <p
-              className="mt-6 text-[15px] leading-relaxed max-w-xl"
-              style={{ color: "var(--text)", opacity: 0.65 }}
-            >
-              Ob du in Deutz wohnst und Hilfe beim Umzug brauchst oder in Lindenthal
-              deine Terrasse machen lassen willst – wir verbinden dich mit Menschen aus
-              deinem Veedel.
+            <p className="mt-7 max-w-xl text-[15px] leading-relaxed text-text/60">
+              Ob du in Deutz wohnst und Hilfe beim Umzug brauchst oder in Lindenthal deine
+              Terrasse machen lassen willst – wir verbinden dich mit Menschen aus deinem Veedel.
             </p>
-          </div>
+          </Reveal>
 
-          <div className="lg:col-span-6">
-            <div
-              className="rounded-2xl bg-background p-6 md:p-8"
-              style={{ border: "1px solid var(--secondary)" }}
-            >
-              <div
-                className="flex items-center gap-2 mb-6 text-[13px] font-semibold uppercase tracking-[0.12em]"
-                style={{ color: "var(--accent)" }}
-              >
-                <MapPin size={14} strokeWidth={2.2} aria-hidden />
+          <Reveal delay={120} className="lg:col-span-6">
+            <div className="card bg-background p-7 md:p-8">
+              <p className="eyebrow eyebrow-plain mb-6">
+                <MapPin size={13} strokeWidth={2.2} aria-hidden />
                 Verfügbar in
-              </div>
+              </p>
 
               <ul className="flex flex-wrap gap-2">
                 {districts.map((district) => (
                   <li
                     key={district}
-                    className="rounded-full px-4 py-2 text-[13.5px] font-medium"
-                    style={{
-                      background: "color-mix(in srgb, var(--primary) 6%, transparent)",
-                      color: "var(--primary)",
-                      border: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)",
-                    }}
+                    className="rounded-full border border-secondary px-3.5 py-1.5 text-[13.5px] font-medium text-primary transition-colors duration-200 hover:border-accent/50 hover:bg-accent/6"
                   >
                     {district}
                   </li>
                 ))}
               </ul>
 
-              <p
-                className="mt-6 text-[13px] leading-relaxed"
-                style={{ color: "var(--text)", opacity: 0.55 }}
-              >
-                Dein Veedel ist nicht dabei? Trag dich ein – wir erweitern Köln Stück für
-                Stück.
+              <p className="mt-7 text-[13px] leading-relaxed text-text/50">
+                Dein Veedel ist nicht dabei? Trag dich ein – wir erweitern Köln Stück für Stück.
               </p>
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
     </section>

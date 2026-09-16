@@ -1,119 +1,56 @@
-import { doc, getDoc, runTransaction, serverTimestamp, setDoc } from "firebase/firestore"
-import { User } from "firebase/auth"
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore"
+import type { User } from "firebase/auth"
 import { db } from "@/lib/firebase/firebase"
-import { AppUser, UserRole } from "@/lib/types/user"
+import type { AppUser, UserRole } from "@/lib/types/user"
+import { fullName } from "@/lib/types/user"
 
-function splitName(displayName: string) {
-  const clean = displayName.trim()
-  if (!clean) {
-    return { firstName: "", lastName: "" }
-  }
-
-  const [firstName, ...rest] = clean.split(" ")
-  return { firstName, lastName: rest.join(" ") }
-}
-
-async function getOrCreateUserNumericId(uid: string) {
-  const userRef = doc(db, "users", uid)
-  const counterRef = doc(db, "users", "counter")
-
-  return runTransaction(db, async (transaction) => {
-    const userSnapshot = await transaction.get(userRef)
-    const existingId = userSnapshot.exists() ? userSnapshot.data().id : undefined
-
-    if (typeof existingId === "number") {
-      return existingId
-    }
-
-    const counterSnapshot = await transaction.get(counterRef)
-    const currentCount = counterSnapshot.exists() ? Number(counterSnapshot.data().count ?? 0) : 0
-    const nextId = currentCount + 1
-
-    transaction.set(counterRef, { count: nextId }, { merge: true })
-    transaction.set(userRef, { id: nextId, updatedAt: serverTimestamp() }, { merge: true })
-
-    return nextId
-  })
-}
-
-export async function ensureUserProfile(user: User, role: UserRole = "provider") {
+/**
+ * Reads the `users/{uid}` profile, creating it on first sign-in.
+ *
+ * The auth UID is the document ID and the only user identity in the system, so
+ * this needs no counter and therefore no transaction: a plain merge write is
+ * idempotent, and two concurrent auth callbacks converge on the same document
+ * instead of racing for the next number.
+ */
+export async function getAppUser(
+  user: User,
+  fallbackRole: UserRole = "provider",
+  displayName = user.displayName ?? "",
+): Promise<AppUser> {
   const userRef = doc(db, "users", user.uid)
   const snapshot = await getDoc(userRef)
-  const { firstName, lastName } = splitName(user.displayName ?? "")
+  const data = snapshot.data() ?? {}
 
-  if (!snapshot.exists()) {
-    const numericId = await getOrCreateUserNumericId(user.uid)
+  const [first = "", ...rest] = displayName.trim().split(/\s+/)
+  const role: UserRole = data.role === "customer" || data.role === "provider" ? data.role : fallbackRole
 
-    await setDoc(userRef, {
-      id: numericId,
-      email: user.email ?? "",
-      firstName,
-      lastName,
-      phone: "",
-      company: "",
-      notificationsEnabled: true,
-      role,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
-    return
+  const profile = {
+    role,
+    email: typeof data.email === "string" && data.email ? data.email : (user.email ?? ""),
+    firstName: typeof data.firstName === "string" && data.firstName ? data.firstName : first,
+    lastName: typeof data.lastName === "string" && data.lastName ? data.lastName : rest.join(" "),
+    phone: typeof data.phone === "string" ? data.phone : "",
+    company: typeof data.company === "string" ? data.company : "",
+    notificationsEnabled: typeof data.notificationsEnabled === "boolean" ? data.notificationsEnabled : true,
   }
 
-  const data = snapshot.data()
-  const updates: Record<string, unknown> = { updatedAt: serverTimestamp() }
-
-  if (typeof data.id !== "number") {
-    updates.id = await getOrCreateUserNumericId(user.uid)
+  // Only write when something actually differs, so signing in is a pure read.
+  if (!snapshot.exists() || Object.entries(profile).some(([key, value]) => data[key] !== value)) {
+    await setDoc(
+      userRef,
+      {
+        ...profile,
+        ...(snapshot.exists() ? {} : { createdAt: serverTimestamp() }),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    )
   }
-
-  if (!data.role || !["provider", "customer"].includes(data.role)) {
-    updates.role = role
-  }
-
-  if (data.notificationsEnabled === undefined) {
-    updates.notificationsEnabled = true
-  }
-
-  if (data.firstName === undefined && firstName) {
-    updates.firstName = firstName
-  }
-
-  if (data.lastName === undefined && lastName) {
-    updates.lastName = lastName
-  }
-
-  if (Object.keys(updates).length > 1) {
-    await setDoc(userRef, updates, { merge: true })
-  }
-}
-
-export async function getAppUser(user: User, fallbackRole: UserRole = "provider"): Promise<AppUser> {
-  const userRef = doc(db, "users", user.uid)
-  const snapshot = await getDoc(userRef)
-
-  if (!snapshot.exists()) {
-    await ensureUserProfile(user, fallbackRole)
-    return {
-      uid: user.uid,
-      numericId: await getOrCreateUserNumericId(user.uid),
-      email: user.email ?? "",
-      displayName: user.displayName ?? "",
-      role: fallbackRole,
-    }
-  }
-
-  const data = snapshot.data()
-  const numericId = typeof data.id === "number" ? data.id : await getOrCreateUserNumericId(user.uid)
-  const role: UserRole = data.role === "customer" ? "customer" : "provider"
-  const firstName = typeof data.firstName === "string" ? data.firstName : ""
-  const lastName = typeof data.lastName === "string" ? data.lastName : ""
-  const fullName = `${firstName} ${lastName}`.trim()
 
   return {
     uid: user.uid,
-    numericId,
-    email: user.email ?? "",
-    displayName: fullName || user.displayName || "",
+    email: profile.email,
+    displayName: fullName(profile) || displayName || profile.email,
     role,
   }
 }

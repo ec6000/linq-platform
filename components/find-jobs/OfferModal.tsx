@@ -1,17 +1,19 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { X, Euro } from "lucide-react"
-import { useOffer } from "@/lib/hooks/useOffers"
-import { useAuth } from "@/components/auth/AuthProvider"
+import { useEffect, useRef, useState } from "react"
+import { Euro, X } from "lucide-react"
+import { parseEuroInCent } from "@/lib/utils/validation"
+import { useOfferActions } from "@/lib/hooks/useOffers"
 
 interface OfferModalProps {
-  orderId: number
+  orderId: string
   orderTitle: string
   isOpen: boolean
   onClose: () => void
   onSuccess?: () => void
 }
+
+const MAX_MESSAGE_LENGTH = 500
 
 export default function OfferModal({
   orderId,
@@ -21,136 +23,129 @@ export default function OfferModal({
   onSuccess,
 }: OfferModalProps) {
   const [priceInput, setPriceInput] = useState("")
-  const [comment, setComment] = useState("")
+  const [message, setMessage] = useState("")
   const [submitted, setSubmitted] = useState(false)
-  const { createOffer, loading, error } = useOffer()
-  const { user } = useAuth()
+  const { submitOffer, loading, error } = useOfferActions()
   const priceRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => priceRef.current?.focus(), 50)
-    } else {
-      const resetTimer = window.setTimeout(() => {
-        setPriceInput("")
-        setComment("")
-        setSubmitted(false)
-      }, 0)
-
-      return () => window.clearTimeout(resetTimer)
+      const focusTimer = setTimeout(() => priceRef.current?.focus(), 50)
+      return () => clearTimeout(focusTimer)
     }
+
+    const resetTimer = window.setTimeout(() => {
+      setPriceInput("")
+      setMessage("")
+      setSubmitted(false)
+    }, 0)
+    return () => window.clearTimeout(resetTimer)
   }, [isOpen])
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose()
+    function onKey(event: KeyboardEvent) {
+      if (isOpen && !loading && event.key === "Escape") onClose()
     }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
-  }, [onClose])
+  }, [isOpen, loading, onClose])
 
-  // ✅ Early return NACH allen Hooks
+  // Early return AFTER all hooks.
   if (!isOpen) return null
 
-  const priceInCent = Math.round(parseFloat(priceInput.replace(",", ".")) * 100)
-  const isValid = !isNaN(priceInCent) && priceInCent > 0 && comment.trim().length < 200
+  let priceInCent = 0
+  try {
+    priceInCent = parseEuroInCent(priceInput)
+  } catch {
+    /* Invalid input keeps submission disabled. */
+  }
+  const isValid = priceInCent > 0 && message.trim().length <= MAX_MESSAGE_LENGTH
 
   async function handleSubmit() {
     if (!isValid || loading) return
-    try {
-      if (!user?.numericId) return
-      await createOffer({ orderId, orderTitle, priceInCent, comment: comment.trim(), providerId: user.numericId })
+    if (await submitOffer(orderId, priceInCent, message)) {
       setSubmitted(true)
       setTimeout(() => {
         onSuccess?.()
         onClose()
-      }, 200)
-    } catch {
-      // error wird vom Hook gesetzt
+      }, 250)
     }
   }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 backdrop-blur-[2px] sm:items-center"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      className="overlay items-end justify-center sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="offer-modal-title"
+      onClick={(event) => event.target === event.currentTarget && onClose()}
     >
-      <div className="w-full max-w-lg rounded-t-3xl bg-background px-6 pb-8 pt-6 shadow-2xl sm:rounded-2xl">
-
-        {/* Handle (mobile) */}
-        <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-secondary sm:hidden" />
-
-        {/* Header */}
-        <div className="mb-6 flex items-start justify-between">
-          <div>
-            <h2 className="text-[17px] font-semibold text-text">Angebot senden</h2>
-            <p className="mt-0.5 text-[13px] text-text/50 line-clamp-1">{orderTitle}</p>
+      <div className="sheet w-full max-w-lg p-6 md:p-7">
+        <div className="mb-7 flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 id="offer-modal-title" className="text-[18px] font-semibold text-text">
+              Angebot senden
+            </h2>
+            <p className="mt-0.5 line-clamp-1 text-[13px] text-text/50">{orderTitle}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl p-1.5 text-text/40 transition hover:bg-secondary hover:text-text"
-          >
-            <X size={18} />
+          <button type="button" onClick={onClose} className="icon-btn -mr-1.5" aria-label="Schließen">
+            <X size={18} strokeWidth={1.9} aria-hidden />
           </button>
         </div>
 
-        {/* Preis */}
-        <div className="mb-4">
-          <label className="mb-1.5 block text-[13px] font-medium text-text/60">
+        <div className="mb-5">
+          <label className="field-label" htmlFor="offer-price">
             Dein Preis
           </label>
-          <div className="flex items-center gap-2 rounded-xl border border-secondary bg-background px-4 py-3 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10">
-            <Euro size={15} className="shrink-0 text-text/30" />
+          <div className="field-group field-h">
+            <Euro size={15} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
             <input
+              id="offer-price"
               ref={priceRef}
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
+              inputMode="decimal"
+              placeholder="0,00"
               value={priceInput}
-              onChange={(e) => setPriceInput(e.target.value)}
-              className="w-full bg-transparent text-[15px] text-text outline-none placeholder:text-text/25"
+              onChange={(event) => setPriceInput(event.target.value)}
+              className="num"
             />
           </div>
         </div>
 
-        {/* Kommentar */}
-        <div className="mb-6">
-          <label className="mb-1.5 block text-[13px] font-medium text-text/60">
-            Kommentar (optional)
+        <div className="mb-7">
+          <label className="field-label" htmlFor="offer-message">
+            Kommentar <span className="font-normal text-text/40">(optional)</span>
           </label>
-          <div className="rounded-xl border border-secondary bg-background px-4 py-3 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10">
-            <textarea
-              rows={3}
-              placeholder="Warum bist du der Richtige für diesen Auftrag?"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              className="w-full resize-none bg-transparent text-[15px] text-text outline-none placeholder:text-text/25"
-            />
-          </div>
+          <textarea
+            id="offer-message"
+            rows={3}
+            maxLength={MAX_MESSAGE_LENGTH}
+            placeholder="Warum bist du der Richtige für diesen Auftrag?"
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            className="field resize-none"
+          />
+          <p className="field-hint mt-1.5 text-right">
+            {message.length} / {MAX_MESSAGE_LENGTH}
+          </p>
         </div>
 
         {error && (
-          <p className="mb-4 text-[12px] text-red-500">{error}</p>
+          <p role="alert" className="notice notice-error mb-5">
+            {error}
+          </p>
         )}
 
-        {/* Actions */}
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 rounded-xl border border-secondary py-3 text-[14px] font-medium text-text/50 transition hover:bg-secondary"
-          >
+          <button type="button" onClick={onClose} className="btn btn-outline btn-lg flex-1">
             Abbrechen
           </button>
           <button
             type="button"
             disabled={!isValid || loading || submitted}
             onClick={handleSubmit}
-            className="flex-1 rounded-xl bg-primary py-3 text-[14px] font-medium text-white transition hover:bg-primary/90 disabled:opacity-40"
+            className="btn btn-primary btn-lg flex-1"
           >
-            {submitted ? "Gesendet ✓" : loading ? "…" : "Absenden"}
+            {submitted ? "Gesendet" : loading ? "Wird gesendet…" : "Absenden"}
           </button>
         </div>
       </div>

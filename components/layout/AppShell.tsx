@@ -20,7 +20,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       {!isPublicPath && user && <Navbar userRole={user.role} userName={userName} />}
-      <ProtectedRoute>{children}</ProtectedRoute>
+      {/* Keyed on the path so each page arrives with the same short fade-up. */}
+      <div key={pathname} className="page-enter">
+        <ProtectedRoute>{children}</ProtectedRoute>
+      </div>
     </>
   )
 }

@@ -1,214 +1,146 @@
 "use client"
 
 import { useState } from "react"
-import { Job, JobSourceType, JobStatus } from "@/lib/types/job"
-import { PricingType } from "@/lib/types/service"
-import { useUpdateJobStatus } from "@/lib/hooks/useChangeJobStatus"
+import { CalendarDays, MapPin } from "lucide-react"
+import { JOB_SOURCE_LABEL, JOB_STATUS_LABEL, JobStatus, type Job } from "@/lib/types/job"
+import { useUpdateJobStatus } from "@/lib/hooks/useJobs"
+import { getNextJobStatus } from "@/lib/utils/jobStatus"
+import { formatDateTime, formatPrice } from "@/lib/utils/format"
 import ConfirmationModal from "@/components/ConfirmationModal"
 
 const statusStyles: Record<JobStatus, string> = {
-  [JobStatus.open]: "bg-accent/10 text-accent",
-  [JobStatus.pending]: "bg-accent/10 text-warning",
-  [JobStatus.inProgress]: "bg-primary/10 text-primary",
-  [JobStatus.completed]: "bg-secondary text-text/60",
-  [JobStatus.accepted]: "bg-primary/10 text-primary",
-  [JobStatus.cancelled]: "bg-secondary text-error/40",
+  [JobStatus.scheduled]: "pill-accent",
+  [JobStatus.inProgress]: "pill-primary",
+  [JobStatus.completed]: "pill-success",
+  [JobStatus.cancelled]: "pill-muted",
 }
 
-const statusLabel: Record<JobStatus, string> = {
-  [JobStatus.open]: "Offen",
-  [JobStatus.pending]: "Ausstehend",
-  [JobStatus.inProgress]: "In Bearbeitung",
-  [JobStatus.completed]: "Abgeschlossen",
-  [JobStatus.accepted]: "Bestätigt",
-  [JobStatus.cancelled]: "Storniert",
-}
-
-const sourceLabel: Record<JobSourceType, string> = {
-  [JobSourceType.order]: "Auftrag",
-  [JobSourceType.service]: "Service",
-}
-
-const pricingSuffix: Record<PricingType, string> = {
-  [PricingType.fixed]: "",
-  [PricingType.perHour]: " / Std.",
-  [PricingType.perUnit]: " / Einheit",
-}
-
-interface JobCardProps {
-  job: Job
-  categoryName?: string
-  subcategoryName?: string
-}
-
-function formatPrice(valueInCent: number, pricingType: PricingType, unitName?: string) {
-  const value = (valueInCent / 100).toLocaleString("de-DE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-  const suffix = pricingType === PricingType.perUnit && unitName ? ` / ${unitName}` : pricingSuffix[pricingType]
-  return `${value} €${suffix}`
-}
-
-function formatScheduledAt(value?: { toDate: () => Date }) {
-  if (!value) return null
-  const date = value.toDate()
-  const datePart = date.toLocaleDateString("de-DE", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
-  const timePart = date.toLocaleTimeString("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-  return `${datePart} · ${timePart} Uhr`
-}
-
-function getNextStatus(status: JobStatus) {
-  if (status === JobStatus.pending) return JobStatus.inProgress
-  if (status === JobStatus.inProgress) return JobStatus.completed
-  return null
-}
-
-export default function JobCard({ job, categoryName, subcategoryName }: JobCardProps) {
+export default function JobCard({ job }: { job: Job }) {
   const [status, setStatus] = useState<JobStatus>(job.status)
   const { updateJobStatus, loading, error } = useUpdateJobStatus()
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
   const [advanceConfirmOpen, setAdvanceConfirmOpen] = useState(false)
 
-  const nextStatus = getNextStatus(status)
-  const canCancel = status === JobStatus.pending || status === JobStatus.inProgress
-  const scheduledText = formatScheduledAt(job.scheduledAt)
+  const nextStatus = getNextJobStatus(status)
+  const canCancel = status !== JobStatus.completed && status !== JobStatus.cancelled
+  const scheduledText = formatDateTime(job.scheduledAt)
 
   async function handleAdvanceStatus() {
     if (!nextStatus || loading) return
-    await updateJobStatus(job.id, nextStatus)
-    if (!error) setStatus(nextStatus)
+    if (await updateJobStatus(job.id, nextStatus)) {
+      setStatus(nextStatus)
+      setAdvanceConfirmOpen(false)
+    }
   }
 
   async function handleCancel() {
     if (!canCancel || loading) return
-    await updateJobStatus(job.id, JobStatus.cancelled)
-    if (!error) setStatus(JobStatus.cancelled)
-    setCancelConfirmOpen(false)
+    if (await updateJobStatus(job.id, JobStatus.cancelled)) {
+      setStatus(JobStatus.cancelled)
+      setCancelConfirmOpen(false)
+    }
   }
 
   return (
     <>
-      <article className="rounded-2xl border border-secondary bg-background p-6 transition hover:border-primary/30 hover:shadow-sm">
-      {/* Header: Meta-Pills + Status */}
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-[12px] text-text/55">
-          <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 font-medium text-primary">
-            {sourceLabel[job.sourceType]}
-          </span>
-          {categoryName && (
-            <>
-              <span className="text-text/25">·</span>
-              <span>{categoryName}</span>
-            </>
-          )}
-          {subcategoryName && (
-            <>
-              <span className="text-text/25">·</span>
-              <span>{subcategoryName}</span>
-            </>
-          )}
+      <article className="card card-interactive p-6">
+        <div className="mb-3.5 flex items-start justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-text/50">
+            <span className="pill pill-outline">{JOB_SOURCE_LABEL[job.sourceType]}</span>
+            <span>{job.categoryName}</span>
+            {job.subcategoryName && (
+              <>
+                <span aria-hidden className="text-text/20">
+                  ·
+                </span>
+                <span>{job.subcategoryName}</span>
+              </>
+            )}
+          </div>
+
+          <span className={`pill ${statusStyles[status]}`}>{JOB_STATUS_LABEL[status]}</span>
         </div>
 
-        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${statusStyles[status]}`}>
-          {statusLabel[status]}
-        </span>
-      </div>
+        <h2 className="text-[17px] font-semibold leading-snug text-text">{job.title}</h2>
+        {job.description && (
+          <p className="mt-1.5 line-clamp-2 text-[13.5px] leading-relaxed text-text/55">
+            {job.description}
+          </p>
+        )}
 
-      {/* Titel + Beschreibung */}
-      <h2 className="text-[17px] font-semibold leading-snug text-text">{job.title}</h2>
-      {job.description && (
-        <p className="mt-1.5 text-[13px] leading-relaxed text-text/60 line-clamp-2">
-          {job.description}
+        <p className="num mt-5 text-[22px] font-semibold text-text">
+          {formatPrice(job.priceInCent, job.pricing)}
         </p>
-      )}
 
-      {/* Preis prominent */}
-      <div className="mt-5 text-[20px] font-semibold tracking-tight text-text">
-        {formatPrice(job.priceInCent, job.pricingType, job.unitName)}
-      </div>
-
-      {/* Sekundär-Infos: Termin & Adresse */}
-      {(scheduledText || job.addressText) && (
-        <div className="mt-4 flex flex-col gap-1.5 text-[13px] text-text/65">
+        <div className="mt-4 flex flex-col gap-2 text-[13px] text-text/60">
           {scheduledText && (
-            <div className="flex items-center gap-2">
-              <svg className="h-4 w-4 shrink-0 text-text/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" />
-                <path d="M16 2v4M8 2v4M3 10h18" />
-              </svg>
-              <span>{scheduledText}</span>
-            </div>
+            <p className="flex items-center gap-2">
+              <CalendarDays size={14} strokeWidth={1.8} className="flex-none text-text/35" aria-hidden />
+              {scheduledText}
+            </p>
           )}
-          {job.addressText && (
-            <div className="flex items-center gap-2">
-              <svg className="h-4 w-4 shrink-0 text-text/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-              <span>{job.addressText}</span>
-            </div>
-          )}
+          <p className="flex items-center gap-2">
+            <MapPin size={14} strokeWidth={1.8} className="flex-none text-text/35" aria-hidden />
+            {job.place.address}
+          </p>
         </div>
-      )}
 
-      {error && <p className="mt-4 text-[12px] text-red-500">{error}</p>}
+        {error && (
+          <p role="alert" className="notice notice-error mt-4">
+            {error}
+          </p>
+        )}
 
-      {/* Aktionen */}
-      {(canCancel || nextStatus) && (
-        <div className="mt-5 flex items-center justify-end gap-2 border-t border-secondary pt-4">
-          {canCancel && (
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => setCancelConfirmOpen(true)}
-              className="rounded-xl px-4 py-2 text-[13px] font-medium text-text/50 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
-            >
-              Stornieren
-            </button>
-          )}
+        {(canCancel || nextStatus) && (
+          <div className="mt-6 flex items-center justify-end gap-2 border-t border-secondary pt-5">
+            {canCancel && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => setCancelConfirmOpen(true)}
+                className="btn btn-danger btn-sm"
+              >
+                Stornieren
+              </button>
+            )}
 
-          {nextStatus && (
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => setAdvanceConfirmOpen(true)}
-              className="rounded-xl bg-primary px-4 py-2 text-[13px] font-medium text-white transition hover:bg-primary/90 disabled:opacity-50"
-            >
-              {loading ? "…" : status === JobStatus.pending ? "Starten" : "Abschließen"}
-            </button>
-          )}
-        </div>
-      )}
+            {nextStatus && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => setAdvanceConfirmOpen(true)}
+                className="btn btn-primary btn-sm"
+              >
+                {nextStatus === JobStatus.inProgress ? "Starten" : "Abschließen"}
+              </button>
+            )}
+          </div>
+        )}
       </article>
+
       <ConfirmationModal
-      open={advanceConfirmOpen}
-      title={status === JobStatus.pending ? "Job wirklich starten?" : "Job wirklich abschließen?"}
-      description={status === JobStatus.pending ? "Der Job wechselt in den Status In Bearbeitung." : "Der Job wird als abgeschlossen markiert."}
-      confirmLabel={status === JobStatus.pending ? "Ja, starten" : "Ja, abschließen"}
-      loading={loading}
-      onCancel={() => setAdvanceConfirmOpen(false)}
-      onConfirm={async () => {
-        await handleAdvanceStatus()
-        setAdvanceConfirmOpen(false)
-      }}
+        open={advanceConfirmOpen}
+        title={nextStatus === JobStatus.inProgress ? "Job wirklich starten?" : "Job wirklich abschließen?"}
+        description={
+          nextStatus === JobStatus.inProgress
+            ? "Der Job wechselt in den Status In Arbeit."
+            : "Der Job wird als abgeschlossen markiert."
+        }
+        confirmLabel={nextStatus === JobStatus.inProgress ? "Ja, starten" : "Ja, abschließen"}
+        loading={loading}
+        onCancel={() => setAdvanceConfirmOpen(false)}
+        onConfirm={handleAdvanceStatus}
       />
+
       <ConfirmationModal
-      open={cancelConfirmOpen}
-      title="Job wirklich stornieren?"
-      description="Du kannst den Status danach nicht automatisch zurücksetzen."
-      confirmLabel="Ja, stornieren"
-      loading={loading}
-      onCancel={() => setCancelConfirmOpen(false)}
-      onConfirm={handleCancel}
+        open={cancelConfirmOpen}
+        title="Job wirklich stornieren?"
+        description="Du kannst den Status danach nicht automatisch zurücksetzen."
+        confirmLabel="Ja, stornieren"
+        destructive
+        loading={loading}
+        onCancel={() => setCancelConfirmOpen(false)}
+        onConfirm={handleCancel}
       />
     </>
   )

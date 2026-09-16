@@ -11,12 +11,12 @@ import Trust from "@/components/marketing/Trust";
 import LocalFocus from "@/components/marketing/LocalFocus";
 import FinalCTA from "@/components/marketing/FinalCTA";
 import {
+  SITE_URL,
   organizationSchema,
   websiteSchema,
   localBusinessSchema,
 } from "@/lib/seo/structuredData";
 
-const SITE_URL = "https://linq.de";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -51,21 +51,13 @@ export const metadata: Metadata = {
     title: "LiNQ – Lokale Dienstleister in Köln finden",
     description:
       "Die einfachste Art, lokale Hilfe in Köln zu finden oder als Dienstleister neue Aufträge zu bekommen.",
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "LiNQ – Lokale Dienstleistungen in Köln",
-      },
-    ],
+
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title: "LiNQ – Lokale Dienstleister in Köln finden",
     description:
       "Reinigung, Umzug, Gartenarbeit & mehr. Lokale Hilfe, die passt.",
-    images: ["/og-image.png"],
   },
   robots: {
     index: true,

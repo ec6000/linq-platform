@@ -1,220 +1,137 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { doc, serverTimestamp, updateDoc } from "firebase/firestore"
-import { Booking, BookingStatus } from "@/lib/types/booking"
-import { db } from "@/lib/firebase/firebase"
-import { PricingType } from "@/lib/types/service"
+import { useState } from "react"
+import { MapPin } from "lucide-react"
+import { BOOKING_STATUS_LABEL, BookingStatus, type Booking } from "@/lib/types/booking"
+import { useRespondToBooking } from "@/lib/hooks/useBookings"
+import { formatPrice } from "@/lib/utils/format"
 import ConfirmationModal from "@/components/ConfirmationModal"
 
-interface BookingCardProps {
-  booking: Booking
-}
-
 const statusStyles: Record<BookingStatus, string> = {
-  [BookingStatus.requested]: "bg-accent/10 text-accent",
-  [BookingStatus.accepted]: "bg-primary/10 text-primary",
-  [BookingStatus.declined]: "bg-secondary text-text/40",
-  [BookingStatus.cancelled]: "bg-secondary text-text/40",
+  [BookingStatus.requested]: "pill-accent",
+  [BookingStatus.accepted]: "pill-success",
+  [BookingStatus.declined]: "pill-muted",
+  [BookingStatus.cancelled]: "pill-muted",
 }
 
-const statusLabel: Record<BookingStatus, string> = {
-  [BookingStatus.requested]: "Angefragt",
-  [BookingStatus.accepted]: "Angenommen",
-  [BookingStatus.declined]: "Abgelehnt",
-  [BookingStatus.cancelled]: "Storniert",
-}
-
-const pricingSuffix: Record<PricingType, string> = {
-  [PricingType.fixed]: "",
-  [PricingType.perHour]: " / Std.",
-  [PricingType.perUnit]: " / Einheit",
-}
-
-function formatPrice(valueInCent: number | undefined, pricingType: PricingType, unitName?: string) {
-  if (valueInCent === undefined) return "Preis auf Anfrage"
-  const value = (valueInCent / 100).toLocaleString("de-DE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-  const suffix =
-    pricingType === PricingType.perUnit && unitName
-      ? ` / ${unitName}`
-      : pricingSuffix[pricingType]
-  return `${value} €${suffix}`
-}
-
-function formatScheduledAt(value?: { toDate: () => Date }) {
-  if (!value) return null
-  const date = value.toDate()
-  const datePart = date.toLocaleDateString("de-DE", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
-  const timePart = date.toLocaleTimeString("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-  return `${datePart} · ${timePart} Uhr`
-}
-
-export default function BookingCard({ booking }: BookingCardProps) {
-  const requestedText = formatScheduledAt(booking.requestedAt)
+export default function BookingCard({ booking }: { booking: Booking }) {
   const [status, setStatus] = useState(booking.status)
   const [declineMessage, setDeclineMessage] = useState(booking.declineMessage ?? "")
   const [confirmDeclineOpen, setConfirmDeclineOpen] = useState(false)
   const [confirmAcceptOpen, setConfirmAcceptOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [actionError, setActionError] = useState<string | null>(null)
+  const { respond, loading, error } = useRespondToBooking()
 
   const canRespond = status === BookingStatus.requested
 
-  const declineTextPreview = useMemo(() => {
-    const trimmed = declineMessage.trim()
-    return trimmed.length > 0 ? trimmed : null
-  }, [declineMessage])
-
   async function handleAccept() {
-    setSaving(true)
-    setActionError(null)
-
-    try {
-      await updateDoc(doc(db, "bookings", String(booking.id)), {
-        status: BookingStatus.accepted,
-        acceptedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
+    if (await respond(booking.id, BookingStatus.accepted)) {
       setStatus(BookingStatus.accepted)
-    } catch (err) {
-      console.error(err)
-      setActionError("Booking konnte nicht angenommen werden.")
-    } finally {
-      setSaving(false)
+      setConfirmAcceptOpen(false)
     }
   }
 
   async function handleDecline() {
-    setSaving(true)
-    setActionError(null)
-
-    try {
-      await updateDoc(doc(db, "bookings", String(booking.id)), {
-        status: BookingStatus.declined,
-        declineMessage: declineMessage.trim() || null,
-        declinedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
+    if (await respond(booking.id, BookingStatus.declined, declineMessage)) {
       setStatus(BookingStatus.declined)
       setConfirmDeclineOpen(false)
-    } catch (err) {
-      console.error(err)
-      setActionError("Booking konnte nicht abgelehnt werden.")
-    } finally {
-      setSaving(false)
     }
   }
 
   return (
     <>
-      <article className="rounded-2xl border border-secondary bg-background p-6 transition hover:border-primary/30 hover:shadow-sm">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="text-[12px] uppercase tracking-wide text-text/45">
-            Buchungsanfrage
-          </div>
-
-          <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${statusStyles[status]}`}>
-            {statusLabel[status]}
+      <article className="card card-interactive p-6">
+        <div className="mb-3.5 flex items-center justify-between gap-3">
+          <span className="text-[11.5px] font-semibold uppercase tracking-[0.12em] text-text/40">
+            Anfrage von {booking.customerName}
           </span>
+          <span className={`pill ${statusStyles[status]}`}>{BOOKING_STATUS_LABEL[status]}</span>
         </div>
 
         <h2 className="text-[17px] font-semibold leading-snug text-text">{booking.serviceTitle}</h2>
 
         {booking.message && (
-          <blockquote className="mt-3 border-l-2 border-secondary pl-3 text-[13px] leading-relaxed text-text/65 line-clamp-3">
+          <blockquote className="mt-3.5 line-clamp-3 border-l-2 border-secondary pl-3.5 text-[13.5px] leading-relaxed text-text/60">
             {booking.message}
           </blockquote>
         )}
 
         <div className="mt-5">
-          <div className="text-[11px] uppercase tracking-wide text-text/45">Preisvorschlag</div>
-          <div className="mt-0.5 text-[20px] font-semibold tracking-tight text-text">
-            {formatPrice(booking.priceInCent, booking.pricingType, booking.unitName)}
-          </div>
+          <p className="text-[11.5px] font-semibold uppercase tracking-[0.12em] text-text/40">
+            Preisvorschlag
+          </p>
+          <p className="num mt-1 text-[22px] font-semibold text-text">
+            {booking.priceInCent === undefined
+              ? "Preis auf Anfrage"
+              : formatPrice(booking.priceInCent, booking.pricing)}
+          </p>
         </div>
 
-        {(requestedText || booking.addressText) && (
-          <div className="mt-4 flex flex-col gap-1.5 text-[13px] text-text/65">
-            {requestedText && (
-              <div className="flex items-center gap-2">
-                <svg className="h-4 w-4 shrink-0 text-text/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" />
-                  <path d="M16 2v4M8 2v4M3 10h18" />
-                </svg>
-                <span>{requestedText}</span>
-              </div>
-            )}
-            {booking.addressText && (
-              <div className="flex items-center gap-2">
-                <svg className="h-4 w-4 shrink-0 text-text/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                  <circle cx="12" cy="10" r="3" />
-                </svg>
-                <span>{booking.addressText}</span>
-              </div>
-            )}
-          </div>
+        <div className="mt-4 flex flex-col gap-2 text-[13px] text-text/60">
+          {booking.requestedDateText && (
+            <p className="flex items-center gap-2">
+              <span className="text-text/35">Wunschtermin</span>
+              {booking.requestedDateText}
+            </p>
+          )}
+          <p className="flex items-center gap-2">
+            <MapPin size={14} strokeWidth={1.8} className="flex-none text-text/35" aria-hidden />
+            {booking.place.address}
+          </p>
+        </div>
+
+        {booking.declineMessage && status === BookingStatus.declined && (
+          <p className="card-sunken mt-4 px-3.5 py-2.5 text-[13px] text-text/65">
+            Kommentar zur Ablehnung: {booking.declineMessage}
+          </p>
         )}
 
-        {declineTextPreview && status === BookingStatus.declined && (
-          <p className="mt-4 rounded-xl bg-secondary px-3 py-2 text-[13px] text-text/70">Kommentar zur Ablehnung: {declineTextPreview}</p>
+        {error && (
+          <p role="alert" className="notice notice-error mt-4">
+            {error}
+          </p>
         )}
 
         {canRespond && (
-          <div className="mt-5 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setConfirmAcceptOpen(true)}
-              disabled={saving}
-              className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Annehmen
-            </button>
+          <div className="mt-6 flex items-center justify-end gap-2 border-t border-secondary pt-5">
             <button
               type="button"
               onClick={() => setConfirmDeclineOpen(true)}
-              disabled={saving}
-              className="rounded-lg border border-secondary px-3 py-2 text-sm font-medium text-text/75 transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={loading}
+              className="btn btn-ghost btn-sm"
             >
               Ablehnen
             </button>
+            <button
+              type="button"
+              onClick={() => setConfirmAcceptOpen(true)}
+              disabled={loading}
+              className="btn btn-primary btn-sm"
+            >
+              Annehmen
+            </button>
           </div>
         )}
-
-        {actionError && <p className="mt-3 text-sm text-red-500">{actionError}</p>}
       </article>
 
       <ConfirmationModal
         open={confirmAcceptOpen}
-        title="Booking wirklich annehmen?"
-        description="Der Status wird auf Angenommen gesetzt."
+        title="Anfrage annehmen?"
+        description="Aus der Anfrage wird ein Job, den du anschließend in deinem Dashboard verwaltest."
         confirmLabel="Ja, annehmen"
-        loading={saving}
+        loading={loading}
         onCancel={() => setConfirmAcceptOpen(false)}
-        onConfirm={async () => {
-          await handleAccept()
-          setConfirmAcceptOpen(false)
-        }}
+        onConfirm={handleAccept}
       />
 
       {confirmDeclineOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-text/35 px-4">
-          <div className="w-full max-w-lg rounded-2xl border border-secondary bg-background p-5 shadow-xl">
-            <h3 className="text-lg font-semibold text-text">Booking ablehnen?</h3>
-            <p className="mt-1 text-sm text-text/65">Du kannst optional einen Kommentar für die Ablehnung hinterlegen.</p>
+        <div className="overlay items-center justify-center">
+          <div className="sheet w-full max-w-lg p-6">
+            <h3 className="text-[17px] font-semibold text-text">Anfrage ablehnen?</h3>
+            <p className="mt-2 text-[14px] leading-relaxed text-text/60">
+              Du kannst optional einen Kommentar für die Ablehnung hinterlegen.
+            </p>
 
-            <label className="mt-4 block text-sm font-medium text-text/80" htmlFor={`decline-${booking.id}`}>
+            <label className="field-label mt-6" htmlFor={`decline-${booking.id}`}>
               Kommentar
             </label>
             <textarea
@@ -223,25 +140,25 @@ export default function BookingCard({ booking }: BookingCardProps) {
               onChange={(event) => setDeclineMessage(event.target.value)}
               rows={4}
               placeholder="z. B. Termin passt leider nicht in meinen Kalender"
-              className="mt-2 w-full rounded-xl border border-secondary bg-background px-3 py-2 text-sm text-text outline-none transition focus:border-primary/40"
+              className="field resize-none"
             />
 
-            <div className="mt-4 flex items-center justify-end gap-2">
+            <div className="mt-6 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setConfirmDeclineOpen(false)}
-                disabled={saving}
-                className="rounded-lg border border-secondary px-3 py-2 text-sm text-text/70 transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={loading}
+                className="btn btn-ghost"
               >
                 Abbrechen
               </button>
               <button
                 type="button"
                 onClick={handleDecline}
-                disabled={saving}
-                className="rounded-lg bg-red-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={loading}
+                className="btn btn-danger-solid"
               >
-                {saving ? "Wird gespeichert…" : "Ablehnung bestätigen"}
+                {loading ? "Wird gespeichert…" : "Ablehnung bestätigen"}
               </button>
             </div>
           </div>

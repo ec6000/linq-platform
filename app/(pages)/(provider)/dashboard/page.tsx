@@ -1,88 +1,165 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Briefcase, CalendarClock, HandCoins } from "lucide-react"
+import { CalendarClock, HandCoins, Layers } from "lucide-react"
 import { useJobs } from "@/lib/hooks/useJobs"
 import { useBookings } from "@/lib/hooks/useBookings"
-import { useCategories } from "@/lib/hooks/useCategory"
+import { useProviderOffers } from "@/lib/hooks/useOffers"
 import JobCard from "@/components/dashboard/JobCard"
 import BookingCard from "@/components/dashboard/BookingCard"
-import { JobStatus } from "@/lib/types/job"
-import { useAuth } from "@/components/auth/AuthProvider"
-import { useProviderOffers } from "@/lib/hooks/useProviderOffers"
 import OfferCard from "@/components/dashboard/OfferCard"
+import PageHeader from "@/components/layout/PageHeader"
+import { JOB_STATUS_LABEL, JobStatus } from "@/lib/types/job"
 
 type DashboardTab = "jobs" | "offers" | "bookings"
-type JobFilter = "all" | JobStatus.pending | JobStatus.inProgress | JobStatus.completed | JobStatus.accepted | JobStatus.cancelled
+type JobFilter = "all" | JobStatus
+
+const tabs = [
+  { key: "jobs" as const, label: "Jobs", icon: Layers },
+  { key: "offers" as const, label: "Preisangebote", icon: HandCoins },
+  { key: "bookings" as const, label: "Service-Bookings", icon: CalendarClock },
+]
+
+const jobFilters: Array<{ key: JobFilter; label: string }> = [
+  { key: "all", label: "Alle" },
+  ...Object.values(JobStatus).map((status) => ({ key: status, label: JOB_STATUS_LABEL[status] })),
+]
+
+/** One loading / error / empty treatment for all three tabs. */
+function ListState({
+  loading,
+  error,
+  empty,
+  emptyText,
+}: {
+  loading: boolean
+  error: string | null
+  empty: boolean
+  emptyText: string
+}) {
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="skeleton h-40 rounded-xl" />
+        ))}
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <p role="alert" className="notice notice-error">
+        {error}
+      </p>
+    )
+  }
+  if (empty) {
+    return (
+      <div className="empty">
+        <p className="text-[15px] text-text/50">{emptyText}</p>
+      </div>
+    )
+  }
+  return null
+}
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<DashboardTab>("jobs")
   const [activeJobFilter, setActiveJobFilter] = useState<JobFilter>("all")
-  const { user } = useAuth()
   const { jobs, loading: jobsLoading, error: jobsError } = useJobs()
   const { bookings, loading: bookingsLoading, error: bookingsError } = useBookings()
-  const { offers, loading: offersLoading, error: offersError } = useProviderOffers(user?.numericId)
-  const { categories } = useCategories()
+  const { offers, loading: offersLoading, error: offersError } = useProviderOffers()
 
-  const categoryLookup = useMemo(() => {
-    const byCategoryId = new Map<string, string>()
-    const bySubcategoryId = new Map<string, string>()
-
-    categories.forEach((category) => {
-      byCategoryId.set(category.id, category.nameDE)
-      category.subcategories.forEach((subcategory) => bySubcategoryId.set(subcategory.id, subcategory.nameDE))
-    })
-
-    return { byCategoryId, bySubcategoryId }
-  }, [categories])
-
-  const visibleJobs = useMemo(() => (activeJobFilter === "all" ? jobs : jobs.filter((job) => job.status === activeJobFilter)), [activeJobFilter, jobs])
+  const visibleJobs = useMemo(
+    () => (activeJobFilter === "all" ? jobs : jobs.filter((job) => job.status === activeJobFilter)),
+    [activeJobFilter, jobs],
+  )
 
   return (
-    <main className="mx-auto max-w-[1600px] px-6 py-10">
-      <div className="mb-6 flex items-center gap-3">
-        <Briefcase size={22} className="text-primary" strokeWidth={1.8} />
-        <h1 className="text-[22px] font-semibold tracking-tight text-text">Dashboard</h1>
+    <main id="main" className="shell-wide py-10 md:py-12">
+      <PageHeader title="Dashboard" description="Deine Jobs, Angebote und Buchungsanfragen." />
+
+      {/* Tabs */}
+      <div
+        role="tablist"
+        aria-label="Dashboard-Bereiche"
+        className="mb-7 flex items-center gap-1 border-b border-secondary"
+      >
+        {tabs.map(({ key, label, icon: Icon }) => {
+          const selected = activeTab === key
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setActiveTab(key)}
+              data-active={selected ? "true" : "false"}
+              className="-mb-px flex items-center gap-2 border-b-2 border-transparent px-3.5 py-3 text-[14px] font-medium text-text/50 transition-colors hover:text-text data-[active=true]:border-primary data-[active=true]:text-primary"
+            >
+              <Icon size={15} strokeWidth={1.9} aria-hidden />
+              {label}
+            </button>
+          )
+        })}
       </div>
 
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => setActiveTab("jobs")} className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${activeTab === "jobs" ? "border-primary/30 bg-primary/10 text-primary" : "border-secondary text-text/65 hover:bg-secondary"}`}>
-          Jobs
-        </button>
-        <button type="button" onClick={() => setActiveTab("offers")} className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${activeTab === "offers" ? "border-primary/30 bg-primary/10 text-primary" : "border-secondary text-text/65 hover:bg-secondary"}`}>
-          <span className="inline-flex items-center gap-1.5"><HandCoins size={14} />Preisangebote</span>
-        </button>
-        <button type="button" onClick={() => setActiveTab("bookings")} className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${activeTab === "bookings" ? "border-primary/30 bg-primary/10 text-primary" : "border-secondary text-text/65 hover:bg-secondary"}`}>
-          <span className="inline-flex items-center gap-1.5"><CalendarClock size={14} />Service-Bookings</span>
-        </button>
-      </div>
+      {activeTab === "jobs" && (
+        <section className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {jobFilters.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={() => setActiveJobFilter(chip.key)}
+                data-active={activeJobFilter === chip.key ? "true" : "false"}
+                className="chip"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
 
-      {activeTab === "jobs" && <section className="flex flex-col gap-3">{/* same */}
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          {([{ key: "all", label: "Alle" }, { key: JobStatus.pending, label: "Ausstehend" }, { key: JobStatus.inProgress, label: "In Arbeit" }, { key: JobStatus.completed, label: "Abgeschlossen" }, { key: JobStatus.accepted, label: "Bestätigt" }, { key: JobStatus.cancelled, label: "Storniert" }] as const).map((chip) => {
-            const selected = activeJobFilter === chip.key
-            return <button key={chip.key} type="button" onClick={() => setActiveJobFilter(chip.key)} className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${selected ? "border-primary/30 bg-primary/10 text-primary" : "border-secondary text-text/65 hover:bg-secondary"}`}>{chip.label}</button>
-          })}
-        </div>
-        {jobsLoading && <p className="text-sm text-text/40">Jobs werden geladen…</p>}
-        {jobsError && <p className="text-sm text-red-500">{jobsError}</p>}
-        {!jobsLoading && !jobsError && visibleJobs.length === 0 && <p className="text-sm text-text/40">Keine Jobs gefunden.</p>}
-        {visibleJobs.map((job) => <JobCard key={job.id} job={job} categoryName={categoryLookup.byCategoryId.get(job.categoryId)} subcategoryName={job.subcategoryId ? categoryLookup.bySubcategoryId.get(job.subcategoryId) : undefined} />)}
-      </section>}
+          <ListState
+            loading={jobsLoading}
+            error={jobsError}
+            empty={visibleJobs.length === 0}
+            emptyText="Keine Jobs mit diesem Filter."
+          />
 
-      {activeTab === "offers" && <section className="flex flex-col gap-3">
-        {offersLoading && <p className="text-sm text-text/40">Preisangebote werden geladen…</p>}
-        {offersError && <p className="text-sm text-red-500">{offersError}</p>}
-        {!offersLoading && !offersError && offers.length === 0 && <p className="text-sm text-text/40">Noch keine Preisangebote gesendet.</p>}
-        {offers.map((offer) => <OfferCard key={`${offer.orderId}-${offer.id}`} offer={offer} />)}
-      </section>}
+          {visibleJobs.map((job) => (
+            <JobCard key={job.id} job={job} />
+          ))}
+        </section>
+      )}
 
-      {activeTab === "bookings" && <section className="flex flex-col gap-3">
-        {bookingsLoading && <p className="text-sm text-text/40">Bookings werden geladen…</p>}
-        {bookingsError && <p className="text-sm text-red-500">{bookingsError}</p>}
-        {!bookingsLoading && !bookingsError && bookings.length === 0 && <p className="text-sm text-text/40">Keine Service-Bookings gefunden.</p>}
-        {bookings.map((booking) => <BookingCard key={booking.id} booking={booking} />)}
-      </section>}
+      {activeTab === "offers" && (
+        <section className="flex flex-col gap-4">
+          <ListState
+            loading={offersLoading}
+            error={offersError}
+            empty={offers.length === 0}
+            emptyText="Noch keine Preisangebote gesendet."
+          />
+          {offers.map((offer) => (
+            <OfferCard key={`${offer.orderId}-${offer.providerId}`} offer={offer} />
+          ))}
+        </section>
+      )}
+
+      {activeTab === "bookings" && (
+        <section className="flex flex-col gap-4">
+          <ListState
+            loading={bookingsLoading}
+            error={bookingsError}
+            empty={bookings.length === 0}
+            emptyText="Keine Service-Bookings gefunden."
+          />
+          {bookings.map((booking) => (
+            <BookingCard key={booking.id} booking={booking} />
+          ))}
+        </section>
+      )}
     </main>
   )
 }

@@ -1,74 +1,58 @@
+import Reveal from "@/components/motion/Reveal";
 import SectionHeading from "./SectionHeading";
 
 const steps = [
   {
     step: "01",
     title: "Auftrag beschreiben",
-    text:
-      "In wenigen Feldern sagst du, was gemacht werden soll, wo und wann. Dauert keine zwei Minuten.",
+    text: "In wenigen Feldern sagst du, was gemacht werden soll, wo und wann. Dauert keine zwei Minuten.",
   },
   {
     step: "02",
     title: "Angebote erhalten",
-    text:
-      "Passende Dienstleister aus Köln reagieren mit Preis und Vorschlag. Du vergleichst in Ruhe.",
+    text: "Passende Dienstleister aus Köln reagieren mit Preis und Vorschlag. Du vergleichst in Ruhe.",
   },
   {
     step: "03",
     title: "Direkt umsetzen",
-    text:
-      "Termin bestätigen, Leistung erledigen, fertig. Alles an einem Ort – transparent und ohne Umwege.",
+    text: "Termin bestätigen, Leistung erledigen, fertig. Alles an einem Ort – transparent und ohne Umwege.",
   },
 ];
 
 export default function HowItWorks() {
   return (
-    <section
-      id="so-funktionierts"
-      aria-labelledby="how-heading"
-      className="py-20 md:py-28"
-    >
-      <div className="mx-auto max-w-[1280px] px-6 md:px-10">
-        <SectionHeading
-          eyebrow="So funktioniert's"
-          title="Drei Schritte bis zur erledigten Aufgabe."
-          description="Wir haben LiNQ so einfach gemacht wie möglich – damit der eigentliche Job wieder im Mittelpunkt steht."
-          align="center"
-        />
+    <section id="so-funktionierts" aria-labelledby="how-heading" className="section">
+      <div className="shell">
+        <Reveal>
+          <SectionHeading
+            id="how-heading"
+            eyebrow="So funktioniert's"
+            title="Drei Schritte bis zur erledigten Aufgabe."
+            description="Wir haben LiNQ so einfach gemacht wie möglich – damit der eigentliche Job wieder im Mittelpunkt steht."
+            align="center"
+          />
+        </Reveal>
 
-        <ol className="mt-14 md:mt-20 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 relative">
-          {/* Verbindungslinie desktop */}
+        <ol className="relative mt-16 grid grid-cols-1 gap-12 md:mt-24 md:grid-cols-3 md:gap-10">
+          {/* The thread that ties the three steps together. */}
           <div
-            className="hidden md:block absolute top-7 left-[16.66%] right-[16.66%] h-px"
-            style={{ background: "var(--secondary)" }}
             aria-hidden
+            className="absolute left-[16.66%] right-[16.66%] top-6 hidden h-px bg-secondary md:block"
           />
 
-          {steps.map(({ step, title, text }) => (
-            <li key={step} className="relative flex flex-col items-start md:items-center md:text-center">
-              <div
-                className="relative flex h-14 w-14 items-center justify-center rounded-full text-[14px] font-semibold mb-6"
-                style={{
-                  background: "var(--background)",
-                  border: "1px solid var(--secondary)",
-                  color: "var(--primary)",
-                }}
-              >
+          {steps.map(({ step, title, text }, index) => (
+            <Reveal
+              as="li"
+              key={step}
+              delay={index * 110}
+              className="relative flex flex-col items-start md:items-center md:text-center"
+            >
+              <span className="num flex h-12 w-12 items-center justify-center rounded-full border border-secondary bg-background text-[13px] font-semibold text-primary">
                 {step}
-              </div>
-              <h3
-                className="text-[18px] md:text-[19px] font-semibold mb-2"
-                style={{ color: "var(--primary)" }}
-              >
-                {title}
-              </h3>
-              <p
-                className="text-[15px] leading-relaxed max-w-sm"
-                style={{ color: "var(--text)", opacity: 0.68 }}
-              >
-                {text}
-              </p>
-            </li>
+              </span>
+              <h3 className="mb-2.5 mt-7 text-[19px] font-semibold text-primary">{title}</h3>
+              <p className="max-w-sm text-[15px] leading-relaxed text-text/62">{text}</p>
+            </Reveal>
           ))}
         </ol>
       </div>

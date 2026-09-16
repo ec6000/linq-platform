@@ -1,45 +1,79 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { collection, getDocs } from "firebase/firestore"
+import { useMemo, useState } from "react"
+import { collection, orderBy, query, where } from "firebase/firestore"
+import { useAuth } from "@/components/auth/AuthProvider"
 import { db } from "@/lib/firebase/firebase"
-import type { Booking } from "@/lib/types/booking"
+import { decodeDocument } from "@/lib/firebase/documents"
+import { useFirestoreQuery } from "@/lib/hooks/useFirestoreQuery"
+import { createBooking, respondToBooking, type BookingInput } from "@/lib/data/bookings"
+import type { Booking, BookingStatus } from "@/lib/types/booking"
 
+const decode = decodeDocument<Booking>
+
+/** The signed-in user's bookings, from whichever side of the deal they are on. */
 export function useBookings() {
-  const [bookings, setBookings] = useState<Booking[]>([])
-  const [loading, setLoading] = useState(true)
+  const { user } = useAuth()
+  const uid = user?.uid
+  const role = user?.role
+  const source = useMemo(
+    () =>
+      uid
+        ? query(
+            collection(db, "bookings"),
+            where(role === "customer" ? "customerId" : "providerId", "==", uid),
+            orderBy("createdAt", "desc"),
+          )
+        : null,
+    [uid, role],
+  )
+  const { data, ...state } = useFirestoreQuery(source, decode, "Buchungen konnten nicht geladen werden.")
+  return { bookings: data, ...state }
+}
+
+export function useCreateBooking() {
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function loadBookings() {
-      try {
-        const snapshot = await getDocs(collection(db, "bookings"))
-
-        const data: Booking[] = snapshot.docs
-          .filter((doc) => doc.id !== "counter")
-          .map((doc) => {
-            const raw = doc.data() as Omit<Booking, "id" | "firestoreId"> & { id?: number }
-            const numericId = typeof raw.id === "number" ? raw.id : Number(doc.id)
-
-            return {
-              ...raw,
-              id: numericId,
-              firestoreId: doc.id,
-            }
-          })
-
-        setBookings(data)
-        setError(null)
-      } catch (err) {
-        console.error(err)
-        setError("Bookings konnten nicht geladen werden")
-      } finally {
-        setLoading(false)
-      }
+  async function submit(input: BookingInput) {
+    setLoading(true)
+    setError(null)
+    try {
+      return await createBooking(input)
+    } catch (err) {
+      console.error(err)
+      setError(err instanceof Error ? err.message : "Anfrage konnte nicht gesendet werden.")
+      return null
+    } finally {
+      setLoading(false)
     }
+  }
 
-    loadBookings()
-  }, [])
+  return { submit, loading, error }
+}
 
-  return { bookings, loading, error }
+export function useRespondToBooking() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function respond(
+    bookingId: string,
+    decision: BookingStatus.accepted | BookingStatus.declined,
+    message?: string,
+  ) {
+    setLoading(true)
+    setError(null)
+    try {
+      await respondToBooking(bookingId, decision, message)
+      return true
+    } catch (err) {
+      console.error(err)
+      setError(err instanceof Error ? err.message : "Buchung konnte nicht beantwortet werden.")
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return { respond, loading, error }
 }

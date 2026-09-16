@@ -1,59 +1,75 @@
-import { Timestamp, GeoPoint } from "firebase/firestore"
-import { PricingType } from "./service"
+import type { Timestamp } from "firebase/firestore"
+import type { DocumentMeta, Place, Pricing } from "./common"
 
-export interface Job {
-  id: number
-  firestoreId: string
+/**
+ * Agreed work. Both flows converge here.
+ *
+ * Flow A: booking accepted  → job (source = booking)
+ * Flow B: offer accepted    → job (source = order)
+ *
+ * A job is a snapshot: it keeps its own copy of title, price and place so that
+ * editing the originating service or order never changes what was agreed.
+ */
+export interface Job extends DocumentMeta {
+  /** Firestore document ID — the only identity this job has. */
+  id: string
 
-  // Herkunft
+  /** Where this job came from, and the document it came from. */
   sourceType: JobSourceType
-  sourceId: number // orderId oder serviceId
-  offerId?: number
-  bookingId?: number
+  sourceId: string
 
-  // Beteiligte
-  customerId: number
-  providerId: number
+  customerId: string
+  customerName: string
+  providerId: string
+  providerName: string
 
-  // Snapshot
   title: string
-  description?: string
+  description: string
   categoryId: string
+  categoryName: string
   subcategoryId?: string
-  pricingType: PricingType
+  subcategoryName?: string
+
+  pricing: Pricing
   priceInCent: number
-  unitName?: string
 
-  // Ort & Zeit
-  location?: GeoPoint
-  addressText?: string
-  scheduledAt?: Timestamp
+  place: Place
+  scheduledAt: Timestamp
 
-  // Status
   status: JobStatus
 
-  // Abschluss / Bewertung
-  customerRating?: number
-  providerRating?: number
-
-  // Meta
-  createdAt: Timestamp
-  updatedAt: Timestamp
   startedAt?: Timestamp
   completedAt?: Timestamp
   cancelledAt?: Timestamp
 }
 
 export enum JobSourceType {
+  /** Flow B — grew out of an accepted offer on an order. */
   order = "order",
-  service = "service",
+  /** Flow A — grew out of an accepted booking on a service. */
+  booking = "booking",
 }
 
+/**
+ * Four states, not six. The old model had `open`, `pending` and `accepted` all
+ * meaning "agreed but not started", which is why every transition table had to
+ * collapse them back together.
+ */
 export enum JobStatus {
-  open = "open",
-  pending = "pending",
+  scheduled = "scheduled",
   inProgress = "inProgress",
   completed = "completed",
-  accepted = "accepted",
   cancelled = "cancelled",
+}
+
+export const JOB_STATUS_LABEL: Record<JobStatus, string> = {
+  [JobStatus.scheduled]: "Geplant",
+  [JobStatus.inProgress]: "In Arbeit",
+  [JobStatus.completed]: "Abgeschlossen",
+  [JobStatus.cancelled]: "Storniert",
+}
+
+export const JOB_SOURCE_LABEL: Record<JobSourceType, string> = {
+  [JobSourceType.order]: "Auftrag",
+  [JobSourceType.booking]: "Service",
 }

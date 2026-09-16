@@ -39,7 +39,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ results: [] })
   }
 
-  const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 10) : 5
+  if (text.length > 200) return NextResponse.json({ error: "Suchtext ist zu lang." }, { status: 400 })
+
+  const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), 10) : 5
 
   const url = new URL("https://api.geoapify.com/v1/geocode/autocomplete")
   url.searchParams.set("text", text)
@@ -52,42 +54,46 @@ export async function GET(request: NextRequest) {
   )
   url.searchParams.set("apiKey", apiKey)
 
-  const response = await fetch(url.toString(), { cache: "no-store" })
+  try {
+    const response = await fetch(url.toString(), { cache: "no-store", signal: AbortSignal.timeout(8000) })
 
-  if (!response.ok) {
-    return NextResponse.json({ error: "Geoapify autocomplete request failed." }, { status: 502 })
+    if (!response.ok) {
+      return NextResponse.json({ error: "Geoapify autocomplete request failed." }, { status: 502 })
+    }
+
+    const data = (await response.json()) as { features?: GeoapifyFeature[] }
+
+    const results = (Array.isArray(data.features) ? data.features : [])
+      .map((feature): GeoapifySuggestion | null => {
+        const label = feature.properties?.formatted
+        const lat = feature.properties?.lat
+        const lon = feature.properties?.lon
+
+        if (typeof label !== "string" || !label || typeof lat !== "number" || !Number.isFinite(lat) || Math.abs(lat) > 90 || typeof lon !== "number" || !Number.isFinite(lon) || Math.abs(lon) > 180) {
+          return null
+        }
+
+        return {
+          label,
+          lat,
+          lon,
+          city: feature.properties?.city,
+          county: feature.properties?.county,
+          street: feature.properties?.street,
+        }
+      })
+      .filter((item): item is GeoapifySuggestion => item !== null)
+      .filter((item) => {
+
+        const normalizedCity = item.city?.toLowerCase()
+        const normalizedCounty = item.county?.toLowerCase()
+
+        return normalizedCity?.includes("köln") || normalizedCity?.includes("koeln") || normalizedCounty?.includes("köln")
+      })
+      .map(({ label, lat, lon }) => ({ label, lat, lon }))
+
+    return NextResponse.json({ results })
+  } catch {
+    return NextResponse.json({ error: "Ortsvorschläge sind vorübergehend nicht verfügbar." }, { status: 502 })
   }
-
-  const data = (await response.json()) as { features?: GeoapifyFeature[] }
-
-  const results = (data.features ?? [])
-    .map((feature): GeoapifySuggestion | null => {
-      const label = feature.properties?.formatted
-      const lat = feature.properties?.lat
-      const lon = feature.properties?.lon
-
-      if (!label || typeof lat !== "number" || typeof lon !== "number") {
-        return null
-      }
-
-      return {
-        label,
-        lat,
-        lon,
-        city: feature.properties?.city,
-        county: feature.properties?.county,
-        street: feature.properties?.street,
-      }
-    })
-    .filter((item): item is GeoapifySuggestion => item !== null)
-    .filter((item) => {
-
-      const normalizedCity = item.city?.toLowerCase()
-      const normalizedCounty = item.county?.toLowerCase()
-
-      return normalizedCity?.includes("köln") || normalizedCity?.includes("koeln") || normalizedCounty?.includes("köln")
-    })
-    .map(({ label, lat, lon }) => ({ label, lat, lon }))
-
-  return NextResponse.json({ results })
 }

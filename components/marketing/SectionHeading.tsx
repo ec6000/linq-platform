@@ -6,6 +6,7 @@ interface SectionHeadingProps {
   description?: string | ReactNode;
   align?: "left" | "center";
   as?: "h2" | "h3";
+  id?: string;
 }
 
 export default function SectionHeading({
@@ -14,38 +15,29 @@ export default function SectionHeading({
   description,
   align = "left",
   as: HeadingTag = "h2",
+  id,
 }: SectionHeadingProps) {
-  const alignment =
-    align === "center" ? "text-center items-center" : "text-left items-start";
+  const centered = align === "center";
 
   return (
-    <div className={`flex flex-col gap-3 ${alignment} max-w-2xl ${align === "center" ? "mx-auto" : ""}`}>
+    <div
+      className={`flex max-w-2xl flex-col gap-4 ${
+        centered ? "mx-auto items-center text-center" : "items-start text-left"
+      }`}
+    >
       {eyebrow && (
-        <span
-          className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em]"
-          style={{ color: "var(--accent)" }}
-        >
-          <span
-            className="h-px w-6"
-            style={{ background: "var(--accent)" }}
-            aria-hidden
-          />
-          {eyebrow}
-        </span>
+        <span className={`eyebrow ${centered ? "eyebrow-plain" : ""}`}>{eyebrow}</span>
       )}
+
       <HeadingTag
-        className="text-[30px] md:text-[40px] font-semibold leading-[1.1] tracking-tight"
-        style={{ color: "var(--primary)" }}
+        id={id}
+        className="display text-[32px] leading-[1.1] text-primary md:text-[42px]"
       >
         {title}
       </HeadingTag>
+
       {description && (
-        <p
-          className="text-[16px] md:text-[17px] leading-relaxed"
-          style={{ color: "var(--text)", opacity: 0.7 }}
-        >
-          {description}
-        </p>
+        <p className="text-[16px] leading-relaxed text-text/65 md:text-[17px]">{description}</p>
       )}
     </div>
   );

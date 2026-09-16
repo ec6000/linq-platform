@@ -1,44 +1,57 @@
 "use client"
 
-import { LayoutDashboard, PlusCircle, User } from "lucide-react"
 import Link from "next/link"
+import { ArrowRight, PlusCircle, Search, User } from "lucide-react"
+import PageHeader from "@/components/layout/PageHeader"
+
+const cards = [
+  {
+    icon: PlusCircle,
+    title: "Auftrag erstellen",
+    text: "Beschreibe in zwei Minuten, was du brauchst – und erhalte Angebote von passenden Dienstleistern.",
+    href: "/my-orders/create",
+    cta: "Auftrag erstellen",
+    primary: true,
+  },
+  {
+    icon: Search,
+    title: "Services durchsuchen",
+    text: "Stöbere direkt durch aktive Angebote in Köln und frage unverbindlich an.",
+    href: "/find-services",
+    cta: "Services ansehen",
+  },
+  {
+    icon: User,
+    title: "Profil vervollständigen",
+    text: "Pflege deine Kontaktdaten, damit Dienstleister dich schneller erreichen.",
+    href: "/customer-profile",
+    cta: "Zum Profil",
+  },
+]
 
 export default function CustomerDashboardPage() {
   return (
-    <main className="mx-auto max-w-[1600px] px-6 py-10">
-      <div className="mb-8 flex items-center gap-3">
-        <LayoutDashboard size={22} className="text-primary" strokeWidth={1.8} />
-        <h1 className="text-[22px] font-semibold tracking-tight text-text">
-          Kunden-Dashboard
-        </h1>
-      </div>
+    <main id="main" className="shell-wide py-10 md:py-12">
+      <PageHeader
+        title="Willkommen bei LiNQ"
+        description="Von hier aus startest du einen Auftrag oder findest direkt den passenden Service."
+      />
 
-      <section className="grid gap-4 md:grid-cols-2">
-        <article className="rounded-2xl border border-secondary bg-background p-5">
-          <div className="mb-3 flex items-center gap-2 text-primary">
-            <PlusCircle size={18} strokeWidth={1.8} />
-            <h2 className="text-sm font-semibold text-text">Neuen Auftrag vorbereiten</h2>
-          </div>
-          <p className="text-sm leading-6 text-text/70">
-            Hier entsteht der Kundenbereich, in dem Kunden künftig Aufträge erstellen und passende Provider finden.
-          </p>
-        </article>
-
-        <article className="rounded-2xl border border-secondary bg-background p-5">
-          <div className="mb-3 flex items-center gap-2 text-primary">
-            <User size={18} strokeWidth={1.8} />
-            <h2 className="text-sm font-semibold text-text">Profil vervollständigen</h2>
-          </div>
-          <p className="mb-4 text-sm leading-6 text-text/70">
-            Pflege deine Kundendaten, damit Provider dich später schneller erreichen können.
-          </p>
-          <Link
-            href="/customer-profile"
-            className="inline-flex rounded-xl border border-secondary px-4 py-2 text-sm font-medium text-text transition hover:bg-secondary/40"
-          >
-            Zum Kundenprofil
-          </Link>
-        </article>
+      <section className="grid gap-4 md:grid-cols-3">
+        {cards.map(({ icon: Icon, title, text, href, cta, primary }) => (
+          <article key={title} className="card card-interactive flex flex-col p-6">
+            <Icon size={20} strokeWidth={1.7} className="mb-5 text-accent-ink" aria-hidden />
+            <h2 className="text-[16px] font-semibold text-text">{title}</h2>
+            <p className="mt-2 flex-1 text-[14px] leading-relaxed text-text/60">{text}</p>
+            <Link
+              href={href}
+              className={`btn btn-sm mt-6 self-start ${primary ? "btn-primary" : "btn-outline"}`}
+            >
+              {cta}
+              <ArrowRight size={14} strokeWidth={2.2} aria-hidden />
+            </Link>
+          </article>
+        ))}
       </section>
     </main>
   )

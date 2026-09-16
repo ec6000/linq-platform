@@ -2,79 +2,35 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import {
   ArrowRight,
   BadgeCheck,
   ChevronDown,
-  Filter,
+  ImageIcon,
   MapPin,
   Search,
   SlidersHorizontal,
-  Sparkles,
-  Star,
-  Tags,
 } from "lucide-react"
-import { useCategories } from "@/lib/hooks/useCategory"
-import { useServices } from "@/lib/hooks/useServices"
-import { PricingType, Service, ServiceStatus } from "@/lib/types/service"
-import { findCategoryByOrderValue } from "@/lib/utils/categoryMatching"
+import { haversineDistanceInKm } from "@/lib/utils/geo"
+import { useLocationSuggestions } from "@/lib/hooks/useLocationSuggestions"
+import { useCategories } from "@/lib/hooks/useCategories"
+import { useActiveServices } from "@/lib/hooks/useServices"
+import { PricingType } from "@/lib/types/common"
+import type { Service } from "@/lib/types/service"
+import { PRICING_LABEL, formatDistance, formatPriceRange } from "@/lib/utils/format"
+import PageHeader from "@/components/layout/PageHeader"
 
-type SortKey = "recommended" | "priceAsc" | "priceDesc" | "radiusAsc"
+type SortKey = "newest" | "priceAsc" | "priceDesc" | "distance"
 
-type Coordinates = {
-  lat: number
-  lon: number
-}
+type LocationSuggestion = { lat: number; lon: number; label: string }
 
-type LocationSuggestion = Coordinates & {
-  label: string
-}
+type RankedService = Service & { distanceKm: number | null }
 
-type EnrichedService = Service & {
-  resolvedCategoryName: string
-  resolvedSubcategoryName?: string
-  distanceToSelectedLocation: number | null
-}
-
-const radiusOptions = [5, 10, 15, 20, 30]
-
-const pricingLabel: Record<PricingType, string> = {
-  [PricingType.fixed]: "Festpreis",
-  [PricingType.perHour]: "pro Stunde",
-  [PricingType.perUnit]: "pro Einheit",
-}
-
-function formatBudget(service: Service) {
-  const min = (service.minBudgetInCent / 100).toLocaleString("de-DE")
-  const max = (service.maxBudgetInCent / 100).toLocaleString("de-DE")
-
-  return `${min}-${max} €`
-}
-
-function formatPricingLabel(service: Service) {
-  if (service.pricingType === PricingType.perHour) return "/ Stunde"
-  if (service.pricingType === PricingType.perUnit) return service.unitName ? `/ ${service.unitName}` : "/ Einheit"
-  return "Festpreis"
-}
+const RADIUS_OPTIONS = [5, 10, 15, 20, 30]
 
 function normalize(value: string) {
   return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-}
-
-function haversineDistanceInKm(from: Coordinates, to: Coordinates) {
-  const earthRadius = 6371
-  const dLat = ((to.lat - from.lat) * Math.PI) / 180
-  const dLon = ((to.lon - from.lon) * Math.PI) / 180
-
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((from.lat * Math.PI) / 180) *
-      Math.cos((to.lat * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return earthRadius * c
 }
 
 function SelectField({
@@ -91,184 +47,109 @@ function SelectField({
   disabled?: boolean
 }) {
   return (
-    <label className="relative block">
+    <label className="block">
       <span className="sr-only">{label}</span>
       <select
         value={value}
         onChange={onChange}
         disabled={disabled}
-        className="h-11 w-full appearance-none rounded-2xl border border-secondary bg-background py-0 pl-4 pr-11 text-sm text-text outline-none transition focus:border-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+        className="field field-h field-select"
       >
         {children}
       </select>
-      <ChevronDown
-        aria-hidden="true"
-        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-text/35"
-        size={16}
-      />
     </label>
   )
 }
 
 export default function ServiceSearchPage() {
-  const { services, loading, error } = useServices()
+  const { services, loading, error } = useActiveServices()
   const { categories } = useCategories()
+
   const [query, setQuery] = useState("")
   const [categoryId, setCategoryId] = useState("all")
   const [subcategoryId, setSubcategoryId] = useState("all")
   const [pricingType, setPricingType] = useState("all")
   const [locationQuery, setLocationQuery] = useState("")
   const [selectedLocation, setSelectedLocation] = useState<LocationSuggestion | null>(null)
-  const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([])
-  const [locationLoading, setLocationLoading] = useState(false)
-  const [locationError, setLocationError] = useState<string | null>(null)
+  const {
+    suggestions: locationSuggestions,
+    loading: locationLoading,
+    error: locationError,
+  } = useLocationSuggestions(locationQuery, selectedLocation)
   const [radiusKm, setRadiusKm] = useState(10)
   const [maxBudget, setMaxBudget] = useState("")
-  const [sortKey, setSortKey] = useState<SortKey>("recommended")
+  const [sortKey, setSortKey] = useState<SortKey>("newest")
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
-  const selectedCategory = useMemo(
-    () => categories.find((category) => category.id === categoryId),
+  const category = useMemo(
+    () => categories.find((entry) => entry.id === categoryId),
     [categories, categoryId],
   )
-  const subcategoryOptions = selectedCategory?.subcategories ?? []
+  const subcategories = category?.subcategories ?? []
 
-  const categoryLookup = useMemo(() => {
-    const categoryNames = new Map<string, string>()
-    const subcategoryNames = new Map<string, string>()
-
-    categories.forEach((category) => {
-      categoryNames.set(category.id, category.nameDE)
-      category.subcategories.forEach((subcategory) => {
-        subcategoryNames.set(`${category.id}:${subcategory.id}`, subcategory.nameDE)
-        subcategoryNames.set(subcategory.id, subcategory.nameDE)
-      })
-    })
-
-    return { categoryNames, subcategoryNames }
-  }, [categories])
-
-  useEffect(() => {
-    if (locationQuery.trim().length < 2) {
-      setLocationSuggestions([])
-      setLocationLoading(false)
-      setLocationError(null)
-      return
-    }
-
-    if (selectedLocation && selectedLocation.label === locationQuery.trim()) {
-      return
-    }
-
-    const controller = new AbortController()
-    const timeoutId = window.setTimeout(async () => {
-      setLocationLoading(true)
-      setLocationError(null)
-
-      try {
-        const response = await fetch(
-          `/api/geoapify/autocomplete?text=${encodeURIComponent(locationQuery.trim())}&limit=5`,
-          { signal: controller.signal },
-        )
-
-        if (!response.ok) {
-          throw new Error("Autocomplete request failed")
-        }
-
-        const data = (await response.json()) as { results?: LocationSuggestion[] }
-        setLocationSuggestions(data.results ?? [])
-      } catch (autocompleteError) {
-        if (controller.signal.aborted) {
-          return
-        }
-
-        console.error("[find-services][location-autocomplete]", autocompleteError)
-        setLocationSuggestions([])
-        setLocationError("Ortsvorschläge konnten nicht geladen werden.")
-      } finally {
-        if (!controller.signal.aborted) {
-          setLocationLoading(false)
-        }
-      }
-    }, 300)
-
-    return () => {
-      controller.abort()
-      window.clearTimeout(timeoutId)
-    }
-  }, [locationQuery, selectedLocation])
-
-  const activeServices = useMemo(
-    () => services.filter((service) => service.status === ServiceStatus.active),
-    [services],
-  )
-
-  const filteredServices = useMemo<EnrichedService[]>(() => {
+  const results = useMemo<RankedService[]>(() => {
     const search = normalize(query.trim())
-    const locationSearch = normalize(locationQuery.trim())
-    const maxBudgetInCent = maxBudget ? Number(maxBudget) * 100 : null
+    const maxBudgetInCent = maxBudget ? Math.round(Number(maxBudget.replace(",", ".")) * 100) : null
 
-    return activeServices
-      .map((service) => {
-        const resolvedCategoryName =
-          service.categoryName ||
-          categoryLookup.categoryNames.get(service.categoryId) ||
-          findCategoryByOrderValue(categories, service.categoryId)?.nameDE ||
-          "Kategorie"
-        const resolvedSubcategoryName = service.subcategoryName ||
-          (service.subcategoryId
-            ? categoryLookup.subcategoryNames.get(`${service.categoryId}:${service.subcategoryId}`) ||
-              categoryLookup.subcategoryNames.get(service.subcategoryId)
-            : undefined)
-        const distanceToSelectedLocation = selectedLocation
+    return services
+      .map((service) => ({
+        ...service,
+        distanceKm: selectedLocation
           ? haversineDistanceInKm(selectedLocation, {
-              lat: service.location.latitude,
-              lon: service.location.longitude,
+              lat: service.place.geo.latitude,
+              lon: service.place.geo.longitude,
             })
-          : null
-
-        return {
-          ...service,
-          resolvedCategoryName,
-          resolvedSubcategoryName,
-          distanceToSelectedLocation,
-        }
-      })
+          : null,
+      }))
       .filter((service) => {
         const haystack = normalize(
           [
             service.title,
             service.description,
             service.providerName,
-            service.city,
-            service.resolvedCategoryName,
-            service.resolvedSubcategoryName,
+            service.place.city,
+            service.categoryName,
+            service.subcategoryName,
           ]
             .filter(Boolean)
             .join(" "),
         )
-        const matchesSearch = !search || haystack.includes(search)
-        const matchesCategory = categoryId === "all" || service.categoryId === categoryId
-        const matchesSubcategory =
-          subcategoryId === "all" ||
-          service.subcategoryId === subcategoryId ||
-          normalize(service.resolvedSubcategoryName ?? "") === normalize(subcategoryId)
-        const matchesPricing = pricingType === "all" || service.pricingType === pricingType
-        const matchesLocationText = !locationSearch || Boolean(selectedLocation) || normalize(service.city ?? "").includes(locationSearch)
-        const matchesLocationRadius = !selectedLocation || (service.distanceToSelectedLocation !== null && service.distanceToSelectedLocation <= radiusKm)
-        const matchesBudget = maxBudgetInCent === null || service.minBudgetInCent <= maxBudgetInCent
 
-        return matchesSearch && matchesCategory && matchesSubcategory && matchesPricing && matchesLocationText && matchesLocationRadius && matchesBudget
+        if (search && !haystack.includes(search)) return false
+        if (categoryId !== "all" && service.categoryId !== categoryId) return false
+        if (subcategoryId !== "all" && service.subcategoryId !== subcategoryId) return false
+        if (pricingType !== "all" && service.pricing.type !== pricingType) return false
+        if (maxBudgetInCent !== null && service.minPriceInCent > maxBudgetInCent) return false
+        if (selectedLocation && (service.distanceKm ?? Infinity) > radiusKm) return false
+        return true
       })
       .sort((a, b) => {
-        if (sortKey === "priceAsc") return a.minBudgetInCent - b.minBudgetInCent
-        if (sortKey === "priceDesc") return b.maxBudgetInCent - a.maxBudgetInCent
-        if (sortKey === "radiusAsc") return (a.distanceToSelectedLocation ?? a.radius) - (b.distanceToSelectedLocation ?? b.radius)
-        return b.id - a.id
+        if (sortKey === "priceAsc") return a.minPriceInCent - b.minPriceInCent
+        if (sortKey === "priceDesc") return b.maxPriceInCent - a.maxPriceInCent
+        if (sortKey === "distance") return (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity)
+        return b.createdAt.toMillis() - a.createdAt.toMillis()
       })
-  }, [activeServices, categories, categoryId, categoryLookup, locationQuery, maxBudget, pricingType, query, radiusKm, selectedLocation, sortKey, subcategoryId])
+  }, [
+    categoryId,
+    maxBudget,
+    pricingType,
+    query,
+    radiusKm,
+    selectedLocation,
+    services,
+    sortKey,
+    subcategoryId,
+  ])
 
-  const hasFilters = query || categoryId !== "all" || subcategoryId !== "all" || pricingType !== "all" || locationQuery || maxBudget || selectedLocation
+  const hasFilters = Boolean(
+    query ||
+      categoryId !== "all" ||
+      subcategoryId !== "all" ||
+      pricingType !== "all" ||
+      locationQuery ||
+      maxBudget ||
+      selectedLocation,
+  )
 
   function resetFilters() {
     setQuery("")
@@ -277,94 +158,109 @@ export default function ServiceSearchPage() {
     setPricingType("all")
     setLocationQuery("")
     setSelectedLocation(null)
-    setLocationSuggestions([])
-    setLocationError(null)
     setRadiusKm(10)
     setMaxBudget("")
-    setSortKey("recommended")
+    setSortKey("newest")
   }
 
   return (
-    <main className="mx-auto max-w-[1600px] px-6 py-5 md:px-10 md:py-6">
-      <section className="overflow-hidden rounded-[1.5rem] border border-secondary bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4 md:rounded-[1.75rem] md:p-6">
-        <div className="flex flex-col gap-4 md:gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/70 px-3 py-1 text-xs font-medium text-primary md:mb-3 md:text-[13px]">
-              <Sparkles size={14} /> Service finden
-            </div>
-            <h1 className="text-xl font-semibold tracking-tight text-text md:text-4xl">Finde genau den Service, der zu deinem Auftrag passt.</h1>
-            <p className="mt-2 max-w-2xl text-[13px] leading-5 text-text/65 md:mt-3 md:text-[14px] md:leading-6">Suche nach Tätigkeit, Anbieter, Kategorie oder Ort. Feine Filter helfen dir, Budget, Einsatzgebiet und Abrechnungsmodell passend einzugrenzen.</p>
-          </div>
-          <div className="hidden min-w-[220px] grid-cols-3 gap-2 rounded-2xl border border-secondary bg-background/80 p-3 text-center shadow-sm md:grid">
-            <div><p className="text-xl font-semibold text-text">{activeServices.length}</p><p className="text-xs text-text/45">aktive Services</p></div>
-            <div><p className="text-xl font-semibold text-text">{categories.length}</p><p className="text-xs text-text/45">Kategorien</p></div>
-            <div><p className="text-xl font-semibold text-text">24h</p><p className="text-xs text-text/45">Ø Antwort</p></div>
-          </div>
-        </div>
-      </section>
+    <main id="main" className="shell-wide py-10 md:py-12">
+      <PageHeader
+        title="Service finden"
+        description="Suche nach Tätigkeit, Anbieter, Kategorie oder Ort. Die Filter grenzen Budget, Einsatzgebiet und Abrechnungsmodell ein."
+        count={results.length}
+      />
 
-      <section className="sticky top-[4.25rem] z-20 mt-3 rounded-3xl border border-secondary bg-background/95 p-2.5 shadow-sm backdrop-blur md:p-3">
+      {/* Filter bar: sticks under the navbar so it stays reachable while scrolling. */}
+      <section className="card sticky top-[calc(var(--nav-h)+8px)] z-20 mb-6 bg-background/90 p-3 backdrop-blur-xl md:p-3.5">
         <button
           type="button"
-          onClick={() => setMobileFiltersOpen((previous) => !previous)}
-          className="mb-2 flex w-full items-center justify-between rounded-2xl border border-secondary px-3 py-2 text-sm font-medium text-text md:hidden"
+          onClick={() => setMobileFiltersOpen((open) => !open)}
+          aria-expanded={mobileFiltersOpen}
+          className="flex w-full items-center justify-between rounded-md border border-secondary px-4 py-2.5 text-[14px] font-medium text-text md:hidden"
         >
           <span className="inline-flex items-center gap-2">
-            <SlidersHorizontal size={15} />
-            Suche & Filter
+            <SlidersHorizontal size={15} strokeWidth={1.9} aria-hidden />
+            Suche &amp; Filter
           </span>
           <ChevronDown
             size={16}
-            className={`transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`}
+            aria-hidden
+            className={`transition-transform duration-200 ${mobileFiltersOpen ? "rotate-180" : ""}`}
           />
         </button>
 
-        <div className={`${mobileFiltersOpen ? "grid" : "hidden"} gap-3 md:grid lg:grid-cols-[1.4fr_1fr_0.55fr]`}>
-          <label className="relative block">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text/35" size={18} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Was brauchst du? z.B. Umzug, Fenster, Nachhilfe…" className="h-11 w-full rounded-2xl border border-secondary bg-background pl-11 pr-4 text-sm outline-none transition focus:border-primary/40" />
-          </label>
+        <div
+          className={`${mobileFiltersOpen ? "mt-3 grid" : "hidden"} gap-2.5 md:mt-0 md:grid lg:grid-cols-[1.4fr_1fr_0.6fr]`}
+        >
+          <div className="field-group field-h">
+            <Search size={16} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Was brauchst du? z. B. Umzug, Fenster, Nachhilfe…"
+              aria-label="Suche"
+            />
+          </div>
 
           <div className="relative">
-            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-text/35" size={18} />
-            <input
-              value={locationQuery}
-              onChange={(event) => {
-                setLocationQuery(event.target.value)
-                setSelectedLocation(null)
-              }}
-              placeholder="Ort oder Straße suchen…"
-              className="h-11 w-full rounded-2xl border border-secondary bg-background pl-11 pr-4 text-sm outline-none transition focus:border-primary/40"
-            />
+            <div className="field-group field-h">
+              <MapPin size={16} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
+              <input
+                value={locationQuery}
+                onChange={(event) => {
+                  setLocationQuery(event.target.value)
+                  setSelectedLocation(null)
+                }}
+                placeholder="Ort oder Straße suchen…"
+                aria-label="Ort"
+              />
+            </div>
 
             {locationQuery.trim().length >= 2 && !selectedLocation && (
-              <div className="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-2xl border border-secondary bg-background/95 shadow-xl backdrop-blur">
-                {locationLoading && <p className="px-3 py-2 text-xs text-text/60">Ortsvorschläge werden geladen…</p>}
-                {!locationLoading && locationSuggestions.length === 0 && !locationError && <p className="px-3 py-2 text-xs text-text/60">Keine Ortsvorschläge gefunden.</p>}
-                {!locationLoading && locationSuggestions.map((suggestion) => (
-                  <button
-                    key={`${suggestion.label}-${suggestion.lat}-${suggestion.lon}`}
-                    type="button"
-                    onClick={() => {
-                      setLocationQuery(suggestion.label)
-                      setSelectedLocation(suggestion)
-                      setLocationSuggestions([])
-                    }}
-                    className="block w-full border-b border-secondary/50 px-3 py-2 text-left text-sm text-text last:border-b-0 transition hover:bg-primary/10"
-                  >
-                    {suggestion.label}
-                  </button>
-                ))}
+              <div className="sheet absolute left-0 right-0 z-30 mt-2 overflow-hidden p-1">
+                {locationLoading && (
+                  <p className="px-3 py-2.5 text-[13px] text-text/50">Ortsvorschläge werden geladen…</p>
+                )}
+                {!locationLoading && locationSuggestions.length === 0 && !locationError && (
+                  <p className="px-3 py-2.5 text-[13px] text-text/50">Keine Ortsvorschläge gefunden.</p>
+                )}
+                {!locationLoading &&
+                  locationSuggestions.map((suggestion) => (
+                    <button
+                      key={`${suggestion.label}-${suggestion.lat}-${suggestion.lon}`}
+                      type="button"
+                      onClick={() => {
+                        setLocationQuery(suggestion.label)
+                        setSelectedLocation(suggestion)
+                        setSortKey("distance")
+                      }}
+                      className="block w-full rounded-sm px-3 py-2.5 text-left text-[13.5px] text-text transition-colors hover:bg-muted"
+                    >
+                      {suggestion.label}
+                    </button>
+                  ))}
               </div>
             )}
           </div>
 
-          <SelectField label="Radius" value={radiusKm} onChange={(event) => setRadiusKm(Number(event.target.value))} disabled={!selectedLocation}>
-            {radiusOptions.map((radius) => <option key={radius} value={radius}>{radius} km</option>)}
+          <SelectField
+            label="Radius"
+            value={radiusKm}
+            onChange={(event) => setRadiusKm(Number(event.target.value))}
+            disabled={!selectedLocation}
+          >
+            {RADIUS_OPTIONS.map((radius) => (
+              <option key={radius} value={radius}>
+                {radius} km
+              </option>
+            ))}
           </SelectField>
         </div>
 
-        <div className={`${mobileFiltersOpen ? "mt-3 grid" : "hidden"} gap-3 md:mt-3 md:grid lg:grid-cols-[1fr_1fr_0.75fr_0.75fr_0.9fr]`}>
+        <div
+          className={`${mobileFiltersOpen ? "mt-2.5 grid" : "hidden"} gap-2.5 md:mt-2.5 md:grid lg:grid-cols-[1fr_1fr_0.75fr_0.75fr_0.9fr]`}
+        >
           <SelectField
             label="Kategorie"
             value={categoryId}
@@ -374,59 +270,171 @@ export default function ServiceSearchPage() {
             }}
           >
             <option value="all">Alle Kategorien</option>
-            {categories.map((category) => <option key={category.id} value={category.id}>{category.nameDE}</option>)}
+            {categories.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.nameDE}
+              </option>
+            ))}
           </SelectField>
 
-          <SelectField label="Unterkategorie" value={subcategoryId} onChange={(event) => setSubcategoryId(event.target.value)} disabled={!selectedCategory}>
+          <SelectField
+            label="Unterkategorie"
+            value={subcategoryId}
+            onChange={(event) => setSubcategoryId(event.target.value)}
+            disabled={!category}
+          >
             <option value="all">Alle Unterkategorien</option>
-            {subcategoryOptions.map((subcategory) => <option key={subcategory.id} value={subcategory.id}>{subcategory.nameDE}</option>)}
+            {subcategories.map((entry) => (
+              <option key={entry.slug} value={entry.slug}>
+                {entry.nameDE}
+              </option>
+            ))}
           </SelectField>
 
-          <input value={maxBudget} onChange={(event) => setMaxBudget(event.target.value)} inputMode="numeric" placeholder="Max. €" className="h-11 rounded-2xl border border-secondary bg-background px-4 text-sm outline-none transition focus:border-primary/40" />
+          <input
+            value={maxBudget}
+            onChange={(event) => setMaxBudget(event.target.value)}
+            inputMode="decimal"
+            placeholder="Max. €"
+            aria-label="Maximalbudget"
+            className="field field-h num"
+          />
 
-          <SelectField label="Preisart" value={pricingType} onChange={(event) => setPricingType(event.target.value)}>
+          <SelectField
+            label="Preisart"
+            value={pricingType}
+            onChange={(event) => setPricingType(event.target.value)}
+          >
             <option value="all">Preisart</option>
-            {Object.values(PricingType).map((value) => <option key={value} value={value}>{pricingLabel[value]}</option>)}
+            {Object.values(PricingType).map((value) => (
+              <option key={value} value={value}>
+                {PRICING_LABEL[value]}
+              </option>
+            ))}
           </SelectField>
 
-          <SelectField label="Sortierung" value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)}>
-            <option value="recommended">Empfohlen</option>
+          <SelectField
+            label="Sortierung"
+            value={sortKey}
+            onChange={(event) => setSortKey(event.target.value as SortKey)}
+          >
+            <option value="newest">Neueste zuerst</option>
             <option value="priceAsc">Preis aufsteigend</option>
             <option value="priceDesc">Preis absteigend</option>
-            <option value="radiusAsc">Nächste zuerst</option>
+            <option value="distance" disabled={!selectedLocation}>
+              Nächste zuerst
+            </option>
           </SelectField>
         </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm text-text/55">
-          <div className="flex items-center gap-2"><SlidersHorizontal size={15} /> {filteredServices.length} passende Services gefunden</div>
-          {locationError && <p className="text-xs text-red-500">{locationError}</p>}
-          {hasFilters && <button type="button" onClick={resetFilters} className="rounded-full px-3 py-1.5 text-primary transition hover:bg-primary/10">Filter zurücksetzen</button>}
-        </div>
+
+        {(locationError || hasFilters) && (
+          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 px-1">
+            {locationError ? <p className="text-[12px] text-error">{locationError}</p> : <span />}
+            {hasFilters && (
+              <button type="button" onClick={resetFilters} className="btn btn-ghost btn-sm">
+                Filter zurücksetzen
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
-      <section className="mt-4">
-        {loading && <p className="rounded-2xl border border-secondary p-6 text-sm text-text/50">Services werden geladen…</p>}
-        {error && <p className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-600">{error}</p>}
-        {!loading && !error && filteredServices.length === 0 && <div className="rounded-3xl border border-secondary p-10 text-center"><Filter className="mx-auto mb-3 text-text/30" /><h2 className="text-lg font-semibold text-text">Keine Services gefunden</h2><p className="mt-1 text-sm text-text/55">Passe deine Filter an oder suche nach einem allgemeineren Begriff.</p></div>}
+      <section>
+        {loading && (
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {[0, 1, 2, 3, 4, 5].map((index) => (
+              <div key={index} className="skeleton h-96 rounded-xl" />
+            ))}
+          </div>
+        )}
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredServices.map((service) => (
-            <article key={service.id} className="group overflow-hidden rounded-3xl border border-secondary bg-background transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg">
-              <div className="relative h-44 bg-secondary">
-                {service.imageUrl ? <Image src={service.imageUrl} alt={service.title} fill sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw" className="object-cover transition duration-300 group-hover:scale-105" /> : <div className="flex h-full items-center justify-center text-text/30">Kein Bild</div>}
-              </div>
-              <div className="p-5">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">{service.resolvedCategoryName}</span>
-                    {service.resolvedSubcategoryName && <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-xs font-medium text-text/60"><Tags size={12} /> {service.resolvedSubcategoryName}</span>}
+        {error && (
+          <p role="alert" className="notice notice-error">
+            {error}
+          </p>
+        )}
+
+        {!loading && !error && results.length === 0 && (
+          <div className="empty">
+            <h2 className="text-[17px] font-semibold text-text">Keine Services gefunden</h2>
+            <p className="mx-auto mt-2 max-w-sm text-[14px] leading-relaxed text-text/50">
+              Passe deine Filter an oder suche nach einem allgemeineren Begriff.
+            </p>
+            {hasFilters && (
+              <button type="button" onClick={resetFilters} className="btn btn-outline mt-7">
+                Filter zurücksetzen
+              </button>
+            )}
+          </div>
+        )}
+
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {results.map((service) => (
+            <article
+              key={service.id}
+              className="card card-interactive group flex flex-col overflow-hidden"
+            >
+              <div className="relative h-44 overflow-hidden bg-muted">
+                {service.imageUrl ? (
+                  <Image
+                    src={service.imageUrl}
+                    alt={service.title}
+                    fill
+                    sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
+                    className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-text/20">
+                    <ImageIcon size={26} strokeWidth={1.5} aria-hidden />
                   </div>
-                  <span className="flex items-center gap-1 text-xs text-text/45"><Star size={13} className="fill-accent text-accent" /> 4,9</span>
+                )}
+              </div>
+
+              <div className="flex flex-1 flex-col p-5">
+                <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                  <span className="pill pill-primary">{service.categoryName}</span>
+                  {service.subcategoryName && (
+                    <span className="pill pill-muted">{service.subcategoryName}</span>
+                  )}
                 </div>
-                <h2 className="line-clamp-2 text-lg font-semibold leading-snug text-text">{service.title}</h2>
-                <p className="mt-2 line-clamp-3 text-sm leading-6 text-text/58">{service.description}</p>
-                <div className="mt-4 flex items-center gap-2 text-sm text-text/60"><BadgeCheck size={16} className="text-primary" /> {service.providerName}</div>
-                {service.city && <div className="mt-2 flex items-center gap-2 text-sm text-text/55"><MapPin size={16} /> {service.city} · {service.radius} km Radius</div>}
-                <div className="mt-5 flex items-end justify-between gap-3"><div><p className="text-xs text-text/40">Budget</p><p className="text-xl font-semibold text-text">{formatBudget(service)} <span className="text-sm font-medium text-text/45">{formatPricingLabel(service)}</span></p></div><Link href={`/find-services/${service.id}`} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90">Details <ArrowRight size={15} /></Link></div>
+
+                <h2 className="line-clamp-2 text-[17px] font-semibold leading-snug text-text">
+                  {service.title}
+                </h2>
+                <p className="mt-2 line-clamp-2 text-[13.5px] leading-relaxed text-text/55">
+                  {service.description}
+                </p>
+
+                <div className="mt-4 flex flex-col gap-1.5 text-[13px] text-text/60">
+                  <p className="flex items-center gap-2">
+                    <BadgeCheck size={14} strokeWidth={1.8} className="flex-none text-accent-ink" aria-hidden />
+                    {service.providerName}
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <MapPin size={14} strokeWidth={1.8} className="flex-none text-text/35" aria-hidden />
+                    {service.place.city}
+                    {service.distanceKm === null ? (
+                      <span className="text-text/40">· {service.radiusKm} km Radius</span>
+                    ) : (
+                      <span className="num text-text/40">· {formatDistance(service.distanceKm)} entfernt</span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="mt-auto flex items-end justify-between gap-3 border-t border-secondary pt-5">
+                  <div>
+                    <p className="text-[11.5px] font-semibold uppercase tracking-[0.12em] text-text/40">
+                      Preis
+                    </p>
+                    <p className="num mt-1 text-[17px] font-semibold text-text">
+                      {formatPriceRange(service.minPriceInCent, service.maxPriceInCent, service.pricing)}
+                    </p>
+                  </div>
+                  <Link href={`/find-services/${service.id}`} className="btn btn-primary btn-sm">
+                    Details
+                    <ArrowRight size={14} strokeWidth={2.2} aria-hidden />
+                  </Link>
+                </div>
               </div>
             </article>
           ))}

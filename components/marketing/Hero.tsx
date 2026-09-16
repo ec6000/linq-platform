@@ -1,263 +1,141 @@
 import Link from "next/link";
-import { ArrowRight, MapPin } from "lucide-react";
-import { Expletus_Sans } from "next/font/google";
+import { ArrowRight, Check, MapPin } from "lucide-react";
+import Reveal from "@/components/motion/Reveal";
 
-const expletus = Expletus_Sans({
-  subsets: ["latin"],
-  weight: ["700"],
-  display: "swap",
-});
+const assurances = ["Kostenlos registrieren", "Keine Abo-Falle", "Direkter Kontakt"];
 
 export default function Hero() {
   return (
     <section className="relative overflow-hidden">
-      {/* Subtiler Hintergrund – ruhiger Verlauf, kein Gradient-Kitsch */}
+      {/* A single cool glow behind the headline, drifting slower than the eye tracks. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-x-0 -top-40 h-[560px] aurora"
         style={{
           background:
-            "radial-gradient(80% 60% at 50% -10%, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 60%)",
+            "radial-gradient(52% 50% at 50% 42%, color-mix(in srgb, var(--accent) 16%, transparent) 0%, transparent 70%)",
         }}
       />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[1px]"
-        style={{ background: "var(--secondary)", opacity: 0 }}
-      />
 
-      <div className="relative mx-auto max-w-[1280px] px-6 md:px-10 pt-14 md:pt-24 pb-16 md:pb-28">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
-          <div className="lg:col-span-7 flex flex-col gap-7">
-            <div
-              className="inline-flex items-center gap-2 self-start rounded-full px-3 py-1.5 text-[12px] font-medium"
-              style={{
-                background: "color-mix(in srgb, var(--primary) 6%, transparent)",
-                color: "var(--primary)",
-                border: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)",
-              }}
-            >
+      <div className="shell relative pb-20 pt-16 md:pb-28 md:pt-24">
+        <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
+          <Reveal>
+            <span className="inline-flex items-center gap-2 rounded-full border border-secondary bg-background/70 px-3.5 py-1.5 text-[12.5px] font-medium text-primary backdrop-blur">
               <MapPin size={13} strokeWidth={2.2} aria-hidden />
               Jetzt gestartet in Köln
-            </div>
+            </span>
+          </Reveal>
 
-            <h1
-              className={`${expletus.className} text-[42px] sm:text-[54px] md:text-[64px] leading-[1.02] tracking-tight`}
-              style={{ color: "var(--primary)" }}
-            >
-              Lokale Hilfe.{" "}
-              <span style={{ color: "var(--accent)" }}>Ohne Umwege.</span>
+          <Reveal delay={60}>
+            <h1 className="display mt-8 text-[46px] leading-[1.02] text-primary sm:text-[62px] md:text-[76px]">
+              Lokale Hilfe.
+              <br />
+              <span className="text-accent-ink">Ohne Umwege.</span>
             </h1>
+          </Reveal>
 
-            <p
-              className="max-w-xl text-[17px] md:text-[19px] leading-relaxed"
-              style={{ color: "var(--text)", opacity: 0.72 }}
-            >
-              LiNQ verbindet Kölner mit geprüften Dienstleistern für Reinigung, Umzug,
-              Gartenarbeit und mehr. Auftrag in Minuten veröffentlichen – passende
-              Angebote direkt erhalten.
+          <Reveal delay={120}>
+            <p className="lede mx-auto mt-7 max-w-xl">
+              Beschreibe, was du brauchst. Geprüfte Dienstleister aus deinem Veedel melden
+              sich direkt bei dir.
             </p>
+          </Reveal>
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <Link
-                href="/signup"
-                className="group inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-medium transition-all duration-150"
-                style={{
-                  background: "var(--primary)",
-                  color: "#ffffff",
-                }}
-              >
+          <Reveal delay={180}>
+            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+              <Link href="/signup" className="btn btn-primary btn-lg">
                 Kostenlos registrieren
-                <ArrowRight
-                  size={17}
-                  strokeWidth={2.2}
-                  className="transition-transform duration-150 group-hover:translate-x-0.5"
-                />
+                <ArrowRight size={17} strokeWidth={2.2} aria-hidden />
               </Link>
-
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-medium transition-all duration-150"
-                style={{
-                  background: "transparent",
-                  color: "var(--primary)",
-                  border: "1px solid var(--secondary)",
-                }}
-              >
+              <Link href="/login" className="btn btn-outline btn-lg">
                 Anmelden
               </Link>
             </div>
+          </Reveal>
 
-            <div
-              className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-3 text-[13px]"
-              style={{ color: "var(--text)", opacity: 0.55 }}
-            >
-              <span className="flex items-center gap-2">
-                <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ background: "var(--accent)" }}
-                  aria-hidden
-                />
-                Kostenlos registrieren
-              </span>
-              <span className="flex items-center gap-2">
-                <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ background: "var(--accent)" }}
-                  aria-hidden
-                />
-                Keine Abo-Falle
-              </span>
-              <span className="flex items-center gap-2">
-                <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ background: "var(--accent)" }}
-                  aria-hidden
-                />
-                Direkter Kontakt
-              </span>
-            </div>
-          </div>
-
-          {/* Rechte Seite: visuelle Komposition – stilisierte Karten, keine Stock-Bilder */}
-          <div className="lg:col-span-5 relative">
-            <HeroVisual />
-          </div>
+          <Reveal delay={240}>
+            <ul className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px] text-text/50">
+              {assurances.map((item) => (
+                <li key={item} className="flex items-center gap-1.5">
+                  <Check size={13} strokeWidth={2.6} className="text-accent-ink" aria-hidden />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </Reveal>
         </div>
+
+        <Reveal delay={280} className="mt-16 md:mt-24">
+          <HeroVisual />
+        </Reveal>
       </div>
     </section>
   );
 }
 
+const offers = [
+  { initials: "MS", name: "Marco S.", note: "Kann Samstag ab 9 Uhr", price: "140 €", lead: true },
+  { initials: "AK", name: "Aylin K.", note: "Zwei Helfer, Transporter", price: "165 €" },
+  { initials: "TB", name: "Tom B.", note: "Auch kurzfristig möglich", price: "120 €" },
+];
+
+/**
+ * One card, not a collage: the whole product in a single glance —
+ * an order goes out, offers come back.
+ */
 function HeroVisual() {
   return (
-    <div className="relative mx-auto w-full max-w-md lg:max-w-none">
-      {/* Hintergrund-Karte */}
-      <div
-        className="absolute -right-4 top-8 h-[260px] w-[220px] rounded-2xl"
-        style={{
-          background: "color-mix(in srgb, var(--accent) 8%, transparent)",
-          border: "1px solid color-mix(in srgb, var(--accent) 20%, transparent)",
-        }}
-        aria-hidden
-      />
-
-      {/* Haupt-Karte: "Auftrag" */}
-      <div
-        className="relative rounded-2xl bg-background p-6 shadow-[0_10px_40px_-20px_rgba(10,27,61,0.25)]"
-        style={{ border: "1px solid var(--secondary)" }}
-      >
-        <div className="flex items-center justify-between">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
-            style={{
-              background: "color-mix(in srgb, var(--accent) 12%, transparent)",
-              color: "var(--accent)",
-            }}
-          >
-            <span
-              className="h-1.5 w-1.5 rounded-full animate-pulse"
-              style={{ background: "var(--accent)" }}
-              aria-hidden
-            />
-            Neuer Auftrag
-          </span>
-          <span
-            className="text-[12px]"
-            style={{ color: "var(--text)", opacity: 0.5 }}
-          >
+    <div className="mx-auto w-full max-w-[720px]">
+      <div className="card overflow-hidden shadow-lg">
+        <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-start sm:justify-between md:p-8">
+          <div className="min-w-0">
+            <span className="pill pill-accent">
+              <span className="dot-live" aria-hidden />
+              Neuer Auftrag
+            </span>
+            <h3 className="mt-3.5 text-[19px] font-semibold leading-snug text-primary">
+              Umzugshilfe für 2-Zimmer-Wohnung
+            </h3>
+            <p className="mt-1.5 text-[14px] leading-relaxed text-text/60">
+              Samstag Vormittag, ca. 3 Stunden. Zwei helfende Hände gesucht.
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 whitespace-nowrap text-[13px] text-text/45 sm:flex-col sm:items-end sm:gap-1">
+            <MapPin size={13} strokeWidth={2} aria-hidden />
             Ehrenfeld, Köln
-          </span>
+          </div>
         </div>
 
-        <h3
-          className="mt-4 text-[17px] font-semibold leading-snug"
-          style={{ color: "var(--primary)" }}
-        >
-          Umzugshilfe für 2-Zimmer-Wohnung
-        </h3>
-        <p
-          className="mt-1.5 text-[13.5px] leading-relaxed"
-          style={{ color: "var(--text)", opacity: 0.6 }}
-        >
-          Samstag Vormittag, ca. 3 Stunden. Zwei helfende Hände gesucht.
-        </p>
+        <div className="hairline" />
 
-        <div
-          className="my-5 h-px"
-          style={{ background: "var(--secondary)" }}
-          aria-hidden
-        />
+        <div className="bg-muted/60 px-6 py-5 md:px-8">
+          <p className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-text/40">
+            3 Angebote erhalten
+          </p>
 
-        <div className="flex items-center justify-between">
-          <div className="flex -space-x-2">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="h-7 w-7 rounded-full ring-2 flex items-center justify-center text-[10px] font-semibold"
+          <ul className="mt-4 flex flex-col gap-2.5">
+            {offers.map((offer) => (
+              <li
+                key={offer.initials}
+                className="flex items-center gap-3 rounded-lg border bg-background px-3.5 py-3"
                 style={{
-                  background: `color-mix(in srgb, var(--primary) ${10 + i * 4}%, transparent)`,
-                  color: "var(--primary)",
-                  boxShadow: "0 0 0 2px var(--background)",
+                  borderColor: offer.lead
+                    ? "color-mix(in srgb, var(--accent) 34%, transparent)"
+                    : "var(--secondary)",
                 }}
               >
-                {["M", "S", "A"][i]}
-              </div>
+                <span className="avatar h-8 w-8 text-[11px]">{offer.initials}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px] font-medium text-primary">
+                    {offer.name}
+                  </span>
+                  <span className="block truncate text-[12.5px] text-text/50">{offer.note}</span>
+                </span>
+                <span className="num text-[15px] font-semibold text-primary">{offer.price}</span>
+              </li>
             ))}
-          </div>
-          <span
-            className="text-[12px]"
-            style={{ color: "var(--text)", opacity: 0.6 }}
-          >
-            3 Angebote erhalten
-          </span>
+          </ul>
         </div>
-      </div>
-
-      {/* Kleine schwebende Karte: Bewertung */}
-      <div
-        className="absolute -bottom-6 -left-4 max-w-[220px] rounded-2xl bg-background p-4 shadow-[0_10px_30px_-15px_rgba(10,27,61,0.25)]"
-        style={{ border: "1px solid var(--secondary)" }}
-        aria-hidden
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="h-9 w-9 rounded-full flex items-center justify-center text-[13px] font-semibold"
-            style={{
-              background: "color-mix(in srgb, var(--primary) 10%, transparent)",
-              color: "var(--primary)",
-            }}
-          >
-            LR
-          </div>
-          <div className="flex flex-col">
-            <span
-              className="text-[13px] font-semibold"
-              style={{ color: "var(--primary)" }}
-            >
-              Lena R.
-            </span>
-            <div className="flex items-center gap-1">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <svg
-                  key={i}
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="var(--accent)"
-                >
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01L12 2z" />
-                </svg>
-              ))}
-            </div>
-          </div>
-        </div>
-        <p
-          className="mt-2 text-[12px] leading-snug"
-          style={{ color: "var(--text)", opacity: 0.65 }}
-        >
-          „Termin direkt bestätigt. Alles top geklappt.&quot;
-        </p>
       </div>
     </div>
   );

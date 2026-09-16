@@ -1,296 +1,202 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { ClipboardList, MapPin, Search, SlidersHorizontal, Tag } from "lucide-react"
-import { useOrders } from "@/lib/hooks/useOrders"
-import { useCategories } from "@/lib/hooks/useCategory"
+import { useCallback, useMemo, useRef, useState } from "react"
+import { LayoutGrid, Map as MapIcon, MapPin, Search, Tag, X } from "lucide-react"
+import { haversineDistanceInKm } from "@/lib/utils/geo"
+import { useOpenOrders } from "@/lib/hooks/useOrders"
+import { useLocationSuggestions } from "@/lib/hooks/useLocationSuggestions"
+import { useCategories } from "@/lib/hooks/useCategories"
+import { useGoogleMaps } from "@/lib/hooks/useGoogleMaps"
+import { DetailPanel, MapView, type RankedOrder } from "@/components/find-jobs/OrderMap"
 import OrderCard from "@/components/find-jobs/OrderCard"
-import { OrderStatus } from "@/lib/types/order"
-import { findCategoryByOrderValue, matchesCategoryIdentifier } from "@/lib/utils/categoryMatching"
+import { formatEuro, formatDate } from "@/lib/utils/format"
 
-type Coordinates = {
-  lat: number
-  lon: number
-}
+type LocationSuggestion = { lat: number; lon: number; label: string }
 
-type LocationSuggestion = Coordinates & {
-  label: string
-}
-
-const radiusOptions = [5, 10, 15, 20]
+const RADIUS_OPTIONS = [5, 10, 15, 20, 30]
 const ORDERS_PER_PAGE = 10
 
-function haversineDistanceInKm(from: Coordinates, to: Coordinates) {
-  const earthRadius = 6371
-  const dLat = ((to.lat - from.lat) * Math.PI) / 180
-  const dLon = ((to.lon - from.lon) * Math.PI) / 180
-
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((from.lat * Math.PI) / 180) *
-      Math.cos((to.lat * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return earthRadius * c
+/**
+ * Scores how well an order fits the current filters, 0–100.
+ * Text and category matches weigh most; proximity breaks the tie.
+ */
+function scoreOrder(order: RankedOrder, hasQuery: boolean, titleHit: boolean, hasCategory: boolean) {
+  const text = hasQuery ? (titleHit ? 40 : 25) : 30
+  const category = hasCategory ? 30 : 25
+  const proximity =
+    order.distanceKm === null ? 20 : Math.max(0, Math.round(25 - order.distanceKm))
+  const freshness = order.offerCount === 0 ? 15 : Math.max(0, 15 - order.offerCount * 3)
+  return Math.min(100, text + category + proximity + freshness)
 }
 
 export default function FindOrders() {
-  const { orders, loading, error } = useOrders()
+  const { orders, loading, error } = useOpenOrders()
   const { categories } = useCategories()
 
   const [query, setQuery] = useState("")
   const [locationQuery, setLocationQuery] = useState("")
   const [selectedLocation, setSelectedLocation] = useState<LocationSuggestion | null>(null)
-  const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([])
-  const [locationLoading, setLocationLoading] = useState(false)
-  const [locationError, setLocationError] = useState<string | null>(null)
-  const [radiusKm, setRadiusKm] = useState(5)
-  const [selectedCategoryId, setSelectedCategoryId] = useState("")
-  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("")
-  const [currentPage, setCurrentPage] = useState(1)
-  const selectedCategory = useMemo(
-    () => categories.find((category) => category.id === selectedCategoryId),
-    [categories, selectedCategoryId]
+  const {
+    suggestions: locationSuggestions,
+    loading: locationLoading,
+    error: locationError,
+  } = useLocationSuggestions(locationQuery, selectedLocation)
+  const [radiusKm, setRadiusKm] = useState(10)
+  const [categoryId, setCategoryId] = useState("")
+  const [subcategoryId, setSubcategoryId] = useState("")
+
+  const [selectedOrder, setSelectedOrder] = useState<RankedOrder | null>(null)
+  const [viewMode, setViewMode] = useState<"map" | "list">("map")
+  const { ready: mapsReady, error: mapsError } = useGoogleMaps(viewMode === "map")
+  const [page, setPage] = useState(1)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  const category = useMemo(
+    () => categories.find((entry) => entry.id === categoryId),
+    [categories, categoryId],
   )
-  const subcategoryOptions = selectedCategory?.subcategories ?? []
+  const subcategories = category?.subcategories ?? []
+  const locationActive = Boolean(selectedLocation)
 
-  useEffect(() => {
-    if (locationQuery.trim().length < 2) {
-      setLocationSuggestions([])
-      setLocationLoading(false)
-      setLocationError(null)
-      return
-    }
-
-    if (selectedLocation && selectedLocation.label === locationQuery.trim()) {
-      return
-    }
-
-    const controller = new AbortController()
-    const timeoutId = setTimeout(async () => {
-      setLocationLoading(true)
-      setLocationError(null)
-
-      try {
-        const response = await fetch(
-          `/api/geoapify/autocomplete?text=${encodeURIComponent(locationQuery.trim())}&limit=5`,
-          { signal: controller.signal }
-        )
-
-        if (!response.ok) {
-          throw new Error("Autocomplete request failed")
-        }
-
-        const data = (await response.json()) as { results?: LocationSuggestion[] }
-        setLocationSuggestions(data.results ?? [])
-      } catch (autocompleteError) {
-        if (controller.signal.aborted) {
-          return
-        }
-
-        console.error("[find-jobs][location-autocomplete]", autocompleteError)
-        setLocationSuggestions([])
-        setLocationError("Ortsvorschläge konnten nicht geladen werden.")
-      } finally {
-        if (!controller.signal.aborted) {
-          setLocationLoading(false)
-        }
-      }
-    }, 300)
-
-    return () => {
-      controller.abort()
-      clearTimeout(timeoutId)
-    }
-  }, [locationQuery, selectedLocation])
-
-  const filtered = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
-    const locationFilterActive = Boolean(selectedLocation)
+  const filtered = useMemo<RankedOrder[]>(() => {
+    const search = query.trim().toLowerCase()
 
     return orders
-      .filter((order) => order.status === OrderStatus.available)
-      .map((order) => {
-        const titleMatch = order.title.toLowerCase().includes(normalizedQuery)
-        const customerMatch = order.customerName.toLowerCase().includes(normalizedQuery)
-        const matchesText = normalizedQuery.length === 0 || titleMatch || customerMatch
-
-        const distanceToSelectedLocation = selectedLocation
+      .map((order) => ({
+        ...order,
+        distanceKm: selectedLocation
           ? haversineDistanceInKm(selectedLocation, {
-              lat: order.location.latitude,
-              lon: order.location.longitude,
+              lat: order.place.geo.latitude,
+              lon: order.place.geo.longitude,
             })
-          : null
-
-        const matchesLocation = !locationFilterActive || Boolean(distanceToSelectedLocation !== null)
-
-        const matchesRadius =
-          !locationFilterActive ||
-          (distanceToSelectedLocation !== null && distanceToSelectedLocation <= radiusKm)
-
-        const matchesCategory =
-          !selectedCategory || matchesCategoryIdentifier(selectedCategory, order.categoryId)
-        const matchesSubcategory =
-          !selectedSubcategoryId ||
-          order.subcategoryId.toLowerCase().trim() === selectedSubcategoryId.toLowerCase().trim()
-
-        const textScore =
-          normalizedQuery.length === 0 ? 20 : titleMatch ? 35 : customerMatch ? 20 : 0
-        const categoryScore = !selectedCategory ? 20 : matchesCategory ? 30 : 0
-        const subcategoryScore = !selectedSubcategoryId ? 10 : matchesSubcategory ? 15 : 0
-        const locationScore =
-          !locationFilterActive || distanceToSelectedLocation === null
-            ? 20
-            : matchesRadius
-              ? Math.max(0, Math.round(20 - distanceToSelectedLocation))
-              : 0
-
-        return {
-          ...order,
-          categoryName: selectedCategory
-            ? (matchesCategory ? selectedCategory.nameDE : undefined)
-            : findCategoryByOrderValue(categories, order.categoryId)?.nameDE,
-          matchingScore: textScore + categoryScore + subcategoryScore + locationScore,
-          matchesText,
-          matchesCategory,
-          matchesSubcategory,
-          matchesLocation,
-          matchesRadius,
-        }
-      })
+          : null,
+        matchScore: 0,
+      }))
       .filter((order) => {
+        if (categoryId && order.categoryId !== categoryId) return false
+        if (subcategoryId && order.subcategoryId !== subcategoryId) return false
+        if (selectedLocation && (order.distanceKm ?? Infinity) > radiusKm) return false
+        if (!search) return true
         return (
-          order.matchesText &&
-          order.matchesCategory &&
-          order.matchesSubcategory &&
-          order.matchesLocation &&
-          order.matchesRadius
+          order.title.toLowerCase().includes(search) ||
+          order.customerName.toLowerCase().includes(search) ||
+          order.description.toLowerCase().includes(search)
         )
       })
-      .sort((a, b) => b.matchingScore - a.matchingScore)
-  }, [categories, orders, query, radiusKm, selectedCategory, selectedLocation, selectedSubcategoryId])
+      .map((order) => ({
+        ...order,
+        matchScore: scoreOrder(
+          order,
+          Boolean(search),
+          Boolean(search) && order.title.toLowerCase().includes(search),
+          Boolean(categoryId),
+        ),
+      }))
+      .sort((a, b) => b.matchScore - a.matchScore)
+  }, [categoryId, orders, query, radiusKm, selectedLocation, subcategoryId])
 
-  useEffect(() => {
-    if (orders.length === 0) {
-      return
-    }
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ORDERS_PER_PAGE))
+  const currentPage = Math.min(page, totalPages)
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * ORDERS_PER_PAGE, currentPage * ORDERS_PER_PAGE),
+    [currentPage, filtered],
+  )
 
-    const unmatchedOrderCategoryIds = orders
-      .filter((order) => !findCategoryByOrderValue(categories, order.categoryId))
-      .map((order) => order.categoryId)
-
-    console.info("[find-jobs][category-debug]", {
-      categoriesLoaded: categories.length,
-      selectedCategoryId,
-      sampleCategoryMappings: categories.slice(0, 5).map((category) => ({
-        id: category.id,
-        firestoreId: category.firestoreId,
-        nameDE: category.nameDE,
-      })),
-      uniqueOrderCategoryIds: [...new Set(orders.map((order) => order.categoryId))],
-      unmatchedOrderCategoryIds: [...new Set(unmatchedOrderCategoryIds)],
-      visibleOrdersAfterFilter: filtered.length,
-    })
-  }, [categories, filtered.length, orders, selectedCategoryId])
+  const visibleSelectedOrder = filtered.find((order) => order.id === selectedOrder?.id) ?? null
 
   const locationHint = useMemo(() => {
-    if (!locationQuery.trim()) {
-      return null
-    }
-
-    if (!selectedLocation) {
-      return "Bitte einen Ort aus den Vorschlägen auswählen, damit der Radiusfilter aktiv wird."
-    }
-
-    return "Es werden nur Orte und Adressen in Köln vorgeschlagen. Radius wird zur ausgewählten Position berechnet."
+    if (!locationQuery.trim()) return null
+    if (!selectedLocation) return "Bitte einen Ort aus den Vorschlägen auswählen, damit der Radiusfilter greift."
+    return `Radius wird zu "${selectedLocation.label}" berechnet.`
   }, [locationQuery, selectedLocation])
 
-  const resetFilters = () => {
+  function resetFilters() {
     setQuery("")
     setLocationQuery("")
     setSelectedLocation(null)
-    setLocationSuggestions([])
-    setLocationError(null)
-    setRadiusKm(5)
-    setSelectedCategoryId("")
-    setSelectedSubcategoryId("")
+    setRadiusKm(10)
+    setCategoryId("")
+    setSubcategoryId("")
+    setSelectedOrder(null)
+    setPage(1)
   }
 
-  const locationFilterActive = Boolean(selectedLocation)
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ORDERS_PER_PAGE))
-  const paginatedOrders = useMemo(() => {
-    const start = (currentPage - 1) * ORDERS_PER_PAGE
-    return filtered.slice(start, start + ORDERS_PER_PAGE)
-  }, [currentPage, filtered])
-
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [query, locationQuery, radiusKm, selectedCategoryId, selectedSubcategoryId])
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages)
+  const handleOrderSelect = useCallback((order: RankedOrder | null) => {
+    setSelectedOrder(order)
+    if (order && listRef.current) {
+      listRef.current
+        .querySelector(`[data-order-id="${order.id}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
     }
-  }, [currentPage, totalPages])
+  }, [])
 
   return (
-    <main className="mx-auto max-w-[1600px] px-6 py-10">
-      <div className="mb-6 flex items-center gap-3">
-        <ClipboardList size={22} className="text-primary" strokeWidth={1.8} />
-        <h1 className="text-[22px] font-semibold tracking-tight text-text">Aufträge finden</h1>
-      </div>
+    <main id="main" className="flex h-[calc(100dvh-var(--nav-h))] min-h-[600px] flex-col overflow-hidden">
+      <div className="flex-none border-b border-secondary bg-background px-6 py-5 md:px-10">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <h1 className="page-title">Aufträge finden</h1>
+            {!loading && <span className="pill pill-primary num">{filtered.length}</span>}
+          </div>
 
-      <section className="mb-7 rounded-2xl border border-secondary bg-background p-4 sm:p-5">
-        <div className="mb-4 flex items-center gap-2">
-          <SlidersHorizontal size={16} className="text-text/50" />
-          <span className="text-sm font-medium text-text">Filter</span>
+          <div className="flex flex-none items-center gap-1 rounded-md border border-secondary p-1">
+            {(
+              [
+                { key: "map" as const, label: "Karte", icon: MapIcon },
+                { key: "list" as const, label: "Liste", icon: LayoutGrid },
+              ]
+            ).map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setViewMode(key)}
+                data-active={viewMode === key ? "true" : "false"}
+                className="flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[13px] font-medium text-text/55 transition-colors hover:text-text data-[active=true]:bg-primary data-[active=true]:text-white"
+              >
+                <Icon size={14} strokeWidth={1.9} aria-hidden />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="relative">
-            <Search
-              size={15}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text/30"
-              strokeWidth={1.8}
-            />
+        <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto_auto]">
+          <div className="field-group field-h">
+            <Search size={15} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
             <input
               type="text"
-              placeholder="Titel oder Kunde durchsuchen…"
+              placeholder="Titel, Beschreibung oder Kunde…"
+              aria-label="Suche"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full rounded-xl border border-secondary bg-background py-2.5 pl-9 pr-4 text-[14px] text-text placeholder:text-text/30 outline-none transition focus:border-primary/40"
+              onChange={(event) => {
+                setQuery(event.target.value)
+                setPage(1)
+              }}
             />
           </div>
 
           <div className="relative">
-            <MapPin
-              size={15}
-              className="absolute left-3.5 top-3 text-text/30"
-              strokeWidth={1.8}
-            />
-            <input
-              type="text"
-              placeholder="Ort oder Straße in Köln suchen…"
-              value={locationQuery}
-              onChange={(e) => {
-                const value = e.target.value
-                setLocationQuery(value)
-                setSelectedLocation(null)
-              }}
-              className="w-full rounded-xl border border-secondary bg-background py-2.5 pl-9 pr-4 text-[14px] text-text placeholder:text-text/30 outline-none transition focus:border-primary/40"
-            />
-
-            {locationQuery.trim().length >= 2 && (
-              <div className="absolute left-0 right-0 z-20 mt-2 overflow-hidden rounded-2xl border border-secondary bg-background/95 shadow-xl backdrop-blur">
+            <div className="field-group field-h">
+              <MapPin size={15} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
+              <input
+                type="text"
+                placeholder="Ort oder Straße in Köln…"
+                aria-label="Ort"
+                value={locationQuery}
+                onChange={(event) => {
+                  setLocationQuery(event.target.value)
+                  setSelectedLocation(null)
+                }}
+              />
+            </div>
+            {locationQuery.trim().length >= 2 && !selectedLocation && (
+              <div className="sheet absolute left-0 right-0 z-30 mt-2 overflow-hidden p-1">
                 {locationLoading && (
-                  <p className="px-3 py-2 text-xs text-text/60">Ortsvorschläge werden geladen…</p>
+                  <p className="px-3 py-2.5 text-[13px] text-text/50">Vorschläge werden geladen…</p>
                 )}
-
                 {!locationLoading && locationSuggestions.length === 0 && !locationError && (
-                  <p className="px-3 py-2 text-xs text-text/60">Keine Ortsvorschläge gefunden.</p>
+                  <p className="px-3 py-2.5 text-[13px] text-text/50">Keine Vorschläge gefunden.</p>
                 )}
-
                 {!locationLoading &&
                   locationSuggestions.map((suggestion) => (
                     <button
@@ -299,9 +205,9 @@ export default function FindOrders() {
                       onClick={() => {
                         setLocationQuery(suggestion.label)
                         setSelectedLocation(suggestion)
-                        setLocationSuggestions([])
+                        setPage(1)
                       }}
-                      className="block w-full border-b border-secondary/50 px-3 py-2 text-left text-sm text-text last:border-b-0 transition hover:bg-primary/10"
+                      className="block w-full rounded-sm px-3 py-2.5 text-left text-[13.5px] text-text transition-colors hover:bg-muted"
                     >
                       {suggestion.label}
                     </button>
@@ -310,122 +216,215 @@ export default function FindOrders() {
             )}
           </div>
 
-          <div className="flex items-center gap-3 rounded-2xl border border-secondary bg-white/30 px-3 py-2.5 shadow-sm">
-            <label htmlFor="radius" className="text-[13px] text-text/70 whitespace-nowrap">
-              Radius
-            </label>
-            <select
-              id="radius"
-              value={radiusKm}
-              onChange={(e) => setRadiusKm(Number(e.target.value))}
-              className="flex-1 appearance-none bg-transparent text-[14px] text-text outline-none"
-              disabled={!locationFilterActive}
-            >
-              {radiusOptions.map((radius) => (
-                <option key={radius} value={radius}>
-                  {radius} km
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            aria-label="Radius"
+            value={radiusKm}
+            onChange={(event) => setRadiusKm(Number(event.target.value))}
+            disabled={!locationActive}
+            className="field field-h field-select"
+          >
+            {RADIUS_OPTIONS.map((radius) => (
+              <option key={radius} value={radius}>
+                {radius} km Radius
+              </option>
+            ))}
+          </select>
+
+          <button type="button" onClick={resetFilters} className="btn btn-outline">
+            <X size={14} strokeWidth={2} aria-hidden />
+            Zurücksetzen
+          </button>
+        </div>
+
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <Tag size={14} strokeWidth={1.8} className="text-text/30" aria-hidden />
+          <select
+            aria-label="Kategorie"
+            value={categoryId}
+            onChange={(event) => {
+              setCategoryId(event.target.value)
+              setSubcategoryId("")
+              setPage(1)
+            }}
+            className="field field-select w-auto py-2 text-[13px]"
+          >
+            <option value="">Alle Kategorien</option>
+            {categories.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.nameDE}
+              </option>
+            ))}
+          </select>
+
+          <select
+            aria-label="Unterkategorie"
+            value={subcategoryId}
+            onChange={(event) => {
+              setSubcategoryId(event.target.value)
+              setPage(1)
+            }}
+            disabled={!category}
+            className="field field-select w-auto py-2 text-[13px]"
+          >
+            <option value="">Alle Unterkategorien</option>
+            {subcategories.map((entry) => (
+              <option key={entry.slug} value={entry.slug}>
+                {entry.nameDE}
+              </option>
+            ))}
+          </select>
         </div>
 
         {(locationHint || locationError) && (
-          <p className="mt-2 text-xs text-text/50">{locationError ?? locationHint}</p>
+          <p className="mt-2.5 text-[12px] text-text/40">{locationError ?? locationHint}</p>
         )}
-
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <label
-            htmlFor="category"
-            className="flex items-center gap-1.5 pr-2 text-[13px] text-text/60"
-          >
-            <Tag size={14} />
-            Kategorien
-          </label>
-
-          <select
-            id="category"
-            value={selectedCategoryId}
-            onChange={(event) => {
-              setSelectedCategoryId(event.target.value)
-              setSelectedSubcategoryId("")
-            }}
-            className="min-w-[220px] appearance-none rounded-2xl border border-secondary bg-white/30 px-3 py-2.5 text-[14px] text-text shadow-sm outline-none transition focus:border-primary/40"
-          >
-            <option value="">Alle Kategorien</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.nameDE}
-              </option>
-            ))}
-          </select>
-
-          <select
-            id="subcategory"
-            value={selectedSubcategoryId}
-            onChange={(event) => setSelectedSubcategoryId(event.target.value)}
-            disabled={!selectedCategory}
-            className="min-w-[220px] appearance-none rounded-2xl border border-secondary bg-white/30 px-3 py-2.5 text-[14px] text-text shadow-sm outline-none transition focus:border-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <option value="">Alle Subkategorien</option>
-            {subcategoryOptions.map((subcategory) => (
-              <option key={subcategory.id} value={subcategory.id}>
-                {subcategory.nameDE}
-              </option>
-            ))}
-          </select>
-
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="ml-auto text-[12px] font-medium text-text/60 transition hover:text-text"
-          >
-            Filter zurücksetzen
-          </button>
-        </div>
-      </section>
-
-      {loading && <p className="text-sm text-text/40">Aufträge werden geladen…</p>}
-
-      {error && <p className="text-sm text-red-500">{error}</p>}
-
-      {!loading && !error && filtered.length === 0 && (
-        <p className="text-sm text-text/40">Keine Aufträge mit den gewählten Filtern gefunden.</p>
-      )}
-
-      <div className="flex flex-col gap-3">
-        {paginatedOrders.map((order) => (
-          <OrderCard
-            key={order.id}
-            order={order}
-            matchingScore={order.matchingScore}
-            categoryName={order.categoryName}
-          />
-        ))}
       </div>
 
-      {!loading && !error && filtered.length > ORDERS_PER_PAGE && (
-        <div className="mt-6 flex items-center justify-between gap-3 text-sm text-text/70">
-          <p>
-            Seite {currentPage} von {totalPages}
+      {loading && (
+        <div className="flex flex-1 items-center justify-center">
+          <span className="flex items-center gap-2.5 text-[13px] text-text/40">
+            <span className="dot-live text-accent" aria-hidden />
+            Aufträge werden geladen
+          </span>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex flex-1 items-center justify-center px-6">
+          <p role="alert" className="notice notice-error">
+            {error}
           </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={currentPage === 1}
-              className="rounded-lg border border-secondary px-3 py-1.5 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+        </div>
+      )}
+
+      {!loading && !error && viewMode === "list" && (
+        <div className="flex-1 overflow-y-auto px-6 py-6 md:px-10">
+          {filtered.length === 0 ? (
+            <div className="empty">
+              <p className="text-[15px] text-text/50">
+                Keine Aufträge mit den gewählten Filtern gefunden.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-4">
+                {paginated.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    matchScore={order.matchScore}
+                    distanceKm={order.distanceKm}
+                  />
+                ))}
+              </div>
+
+              {filtered.length > ORDERS_PER_PAGE && (
+                <div className="mt-8 flex items-center justify-between gap-3 border-t border-secondary pt-6 text-[13.5px] text-text/60">
+                  <p className="num">
+                    Seite {currentPage} von {totalPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="btn btn-outline btn-sm"
+                    >
+                      Zurück
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className="btn btn-outline btn-sm"
+                    >
+                      Weiter
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {!loading && !error && viewMode === "map" && (
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <div className="relative" style={{ height: "58%" }}>
+            {mapsReady ? (
+              <MapView
+                orders={filtered}
+                selectedOrder={visibleSelectedOrder}
+                onOrderSelect={handleOrderSelect}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center bg-muted">
+                <p className="text-[13px] text-text/40">{mapsError ?? "Karte wird geladen…"}</p>
+              </div>
+            )}
+
+            <div className="num pointer-events-none absolute left-4 top-4 rounded-full border border-secondary bg-background/90 px-3.5 py-1.5 text-[12.5px] font-semibold text-primary shadow-sm backdrop-blur-md">
+              {filtered.length} {filtered.length === 1 ? "Auftrag" : "Aufträge"}
+            </div>
+          </div>
+
+          <div className="flex min-h-0 flex-1 border-t border-secondary">
+            <div
+              className={`flex-none overflow-hidden border-r border-secondary transition-all duration-300 ${
+                visibleSelectedOrder ? "w-full sm:w-[340px]" : "w-0"
+              }`}
             >
-              Zurück
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              disabled={currentPage === totalPages}
-              className="rounded-lg border border-secondary px-3 py-1.5 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Weiter
-            </button>
+              {visibleSelectedOrder && (
+                <DetailPanel order={visibleSelectedOrder} onClose={() => setSelectedOrder(null)} />
+              )}
+            </div>
+
+            <div ref={listRef} className="flex-1 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <div className="flex h-full items-center justify-center">
+                  <p className="text-[13px] text-text/40">Keine Aufträge gefunden.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col divide-y divide-secondary">
+                  {filtered.map((order) => (
+                    <button
+                      key={order.id}
+                      type="button"
+                      data-order-id={order.id}
+                      onClick={() => handleOrderSelect(selectedOrder?.id === order.id ? null : order)}
+                      data-active={selectedOrder?.id === order.id ? "true" : "false"}
+                      className="w-full border-l-2 border-l-transparent px-4 py-3.5 text-left transition-colors duration-150 hover:bg-muted data-[active=true]:border-l-accent data-[active=true]:bg-accent/6"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-[14px] font-medium leading-snug text-text">
+                            {order.title}
+                          </p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <span className="text-[11.5px] text-text/45">{order.categoryName}</span>
+                            <span aria-hidden className="text-text/20">
+                              ·
+                            </span>
+                            <span className="flex items-center gap-1 truncate text-[11.5px] text-text/45">
+                              <MapPin size={10} strokeWidth={1.8} aria-hidden />
+                              {order.place.city}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex-none text-right">
+                          <p className="num text-[13.5px] font-semibold text-primary">
+                            {formatEuro(order.budgetInCent, { decimals: false })} €
+                          </p>
+                          <p className="mt-0.5 text-[11.5px] text-text/40">
+                            {formatDate(order.timeWindow.start)}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
