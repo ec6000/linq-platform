@@ -14,7 +14,7 @@ interface PageHeaderProps {
  */
 export default function PageHeader({ title, description, count, actions }: PageHeaderProps) {
   return (
-    <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <header className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         <div className="flex items-center gap-2.5">
           <h1 className="page-title">{title}</h1>
@@ -27,7 +27,7 @@ export default function PageHeader({ title, description, count, actions }: PageH
         )}
       </div>
 
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">{actions}</div>}
     </header>
   );
 }
