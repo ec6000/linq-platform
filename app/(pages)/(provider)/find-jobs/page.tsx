@@ -183,7 +183,14 @@ export default function FindOrders() {
           </div>
         </div>
 
-        <div id="job-search-filters" className={filtersOpen ? "block" : "hidden"}>
+        <form
+          id="job-search-filters"
+          className={filtersOpen ? "block" : "hidden"}
+          onSubmit={(event) => {
+            event.preventDefault()
+            setFiltersOpen(false)
+          }}
+        >
           <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto_auto]">
           <div className="field-group field-h">
             <Search size={15} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
@@ -254,10 +261,16 @@ export default function FindOrders() {
             ))}
           </select>
 
-          <button type="button" onClick={resetFilters} className="btn btn-outline">
-            <X size={14} strokeWidth={2} aria-hidden />
-            Zurücksetzen
-          </button>
+          <div className="flex gap-2">
+            <button type="submit" className="btn btn-primary flex-1 lg:flex-none">
+              <Search size={14} strokeWidth={2} aria-hidden />
+              Suchen
+            </button>
+            <button type="button" onClick={resetFilters} className="btn btn-outline flex-1 lg:flex-none">
+              <X size={14} strokeWidth={2} aria-hidden />
+              Zurücksetzen
+            </button>
+          </div>
           </div>
 
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -302,7 +315,7 @@ export default function FindOrders() {
         {(locationHint || locationError) && (
           <p className="mt-2.5 text-[12px] text-text/40">{locationError ?? locationHint}</p>
         )}
-        </div>
+        </form>
       </div>
 
       {loading && (
