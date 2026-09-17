@@ -44,7 +44,7 @@ export default function DetailedOrderPage() {
 
   if (loading) {
     return (
-      <main id="main" className="mx-auto max-w-[1100px] px-6 py-10 md:px-10">
+      <main id="main" className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 md:px-10 md:py-10">
         <div className="skeleton h-[560px] rounded-xl" />
       </main>
     )
@@ -52,7 +52,7 @@ export default function DetailedOrderPage() {
 
   if (error || !order) {
     return (
-      <main id="main" className="mx-auto max-w-[1100px] px-6 py-10 md:px-10">
+      <main id="main" className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 md:px-10 md:py-10">
         <BackLink />
         <div className="empty">
           <h1 className="text-[17px] font-semibold text-text">
@@ -94,7 +94,7 @@ export default function DetailedOrderPage() {
   ]
 
   return (
-    <main id="main" className="mx-auto max-w-[1100px] px-6 py-10 md:px-10">
+    <main id="main" className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 md:px-10 md:py-10">
       <BackLink />
 
       {offerError && (
@@ -103,7 +103,7 @@ export default function DetailedOrderPage() {
         </p>
       )}
 
-      <section className="card bg-background p-6 md:p-9">
+      <section className="card bg-background p-5 sm:p-6 md:p-9 lg:p-10">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <h1 className="display text-[28px] text-primary md:text-[36px]">{order.title}</h1>
@@ -133,7 +133,7 @@ export default function DetailedOrderPage() {
           </div>
         </div>
 
-        <dl className="mt-9 grid gap-px overflow-hidden rounded-lg border border-secondary bg-secondary sm:grid-cols-2">
+        <dl className="mt-9 grid gap-px overflow-hidden rounded-lg border border-secondary bg-secondary sm:grid-cols-2 lg:grid-cols-4">
           {facts.map(({ icon: Icon, label, value, hint }) => (
             <div key={label} className="bg-background p-5">
               <dt className="flex items-center gap-2 text-[11.5px] font-semibold uppercase tracking-[0.12em] text-text/40">
