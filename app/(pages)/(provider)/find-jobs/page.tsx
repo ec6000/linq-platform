@@ -131,7 +131,7 @@ export default function FindOrders() {
   }, [])
 
   return (
-    <main id="main" className="flex h-[calc(100dvh-var(--nav-h))] min-h-[600px] flex-col overflow-hidden">
+    <main id="main" className="app-viewport flex min-h-[600px] flex-col overflow-hidden">
       <div className="flex-none border-b border-secondary bg-background px-6 py-5 md:px-10">
         <div className="mb-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">

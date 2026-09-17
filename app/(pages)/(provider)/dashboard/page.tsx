@@ -83,7 +83,7 @@ export default function Dashboard() {
       <div
         role="tablist"
         aria-label="Dashboard-Bereiche"
-        className="mb-7 flex items-center gap-1 border-b border-secondary"
+        className="scrollbar-none -mx-4 mb-7 flex snap-x items-center gap-1 overflow-x-auto border-b border-secondary px-4 sm:mx-0 sm:px-0"
       >
         {tabs.map(({ key, label, icon: Icon }) => {
           const selected = activeTab === key
@@ -95,7 +95,7 @@ export default function Dashboard() {
               aria-selected={selected}
               onClick={() => setActiveTab(key)}
               data-active={selected ? "true" : "false"}
-              className="-mb-px flex items-center gap-2 border-b-2 border-transparent px-3.5 py-3 text-[14px] font-medium text-text/50 transition-colors hover:text-text data-[active=true]:border-primary data-[active=true]:text-primary"
+              className="-mb-px flex min-h-12 shrink-0 snap-start items-center gap-2 border-b-2 border-transparent px-3.5 py-3 text-[14px] font-medium text-text/50 transition-colors hover:text-text data-[active=true]:border-primary data-[active=true]:text-primary"
             >
               <Icon size={15} strokeWidth={1.9} aria-hidden />
               {label}
