@@ -24,7 +24,10 @@ const statusStyles: Record<OrderStatus, string> = {
 
 function BackLink() {
   return (
-    <Link href="/find-jobs" className="link-quiet mb-7 inline-flex items-center gap-1.5 text-[13.5px]">
+    <Link
+      href="/find-jobs"
+      className="sticky top-[calc(var(--nav-h)+0.75rem)] z-30 mb-7 inline-flex items-center gap-1.5 rounded-full border border-secondary bg-background/95 px-3.5 py-2 text-[13.5px] font-medium text-text/65 shadow-sm backdrop-blur-md transition-colors hover:text-primary"
+    >
       <ArrowLeft size={14} strokeWidth={2} aria-hidden />
       Zurück zur Übersicht
     </Link>

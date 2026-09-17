@@ -50,6 +50,16 @@ export default function OfferModal({
     return () => document.removeEventListener("keydown", onKey)
   }, [isOpen, loading, onClose])
 
+  useEffect(() => {
+    if (!isOpen) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOpen])
+
   // Early return AFTER all hooks.
   if (!isOpen) return null
 
@@ -74,13 +84,13 @@ export default function OfferModal({
 
   return (
     <div
-      className="overlay items-end justify-center sm:items-center"
+      className="overlay offer-modal-overlay items-center justify-center overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="offer-modal-title"
       onClick={(event) => event.target === event.currentTarget && onClose()}
     >
-      <div className="sheet w-full max-w-lg p-6 md:p-7">
+      <div className="sheet max-h-full w-full max-w-lg overflow-y-auto p-6 md:p-7">
         <div className="mb-7 flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h2 id="offer-modal-title" className="text-[18px] font-semibold text-text">
