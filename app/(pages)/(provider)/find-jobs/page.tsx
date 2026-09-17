@@ -1,7 +1,16 @@
 "use client"
 
 import { useCallback, useMemo, useRef, useState } from "react"
-import { LayoutGrid, Map as MapIcon, MapPin, Search, Tag, X } from "lucide-react"
+import {
+  ChevronDown,
+  LayoutGrid,
+  Map as MapIcon,
+  MapPin,
+  Search,
+  SlidersHorizontal,
+  Tag,
+  X,
+} from "lucide-react"
 import { haversineDistanceInKm } from "@/lib/utils/geo"
 import { useOpenOrders } from "@/lib/hooks/useOrders"
 import { useLocationSuggestions } from "@/lib/hooks/useLocationSuggestions"
@@ -47,6 +56,7 @@ export default function FindOrders() {
 
   const [selectedOrder, setSelectedOrder] = useState<RankedOrder | null>(null)
   const [viewMode, setViewMode] = useState<"map" | "list">("map")
+  const [filtersOpen, setFiltersOpen] = useState(true)
   const { ready: mapsReady, error: mapsError } = useGoogleMaps(viewMode === "map")
   const [page, setPage] = useState(1)
   const listRef = useRef<HTMLDivElement>(null)
@@ -132,20 +142,32 @@ export default function FindOrders() {
 
   return (
     <main id="main" className="app-viewport flex min-h-[600px] flex-col overflow-hidden">
-      <div className="flex-none border-b border-secondary bg-background px-6 py-5 md:px-10">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <h1 className="page-title">Aufträge finden</h1>
+      <div className="flex-none border-b border-secondary bg-background px-4 py-4 sm:px-6 md:px-10 md:py-5">
+        <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${filtersOpen ? "mb-4" : ""}`}>
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <h1 className="page-title whitespace-nowrap">Aufträge finden</h1>
             {!loading && <span className="pill pill-primary num">{filtered.length}</span>}
           </div>
 
-          <div className="flex flex-none items-center gap-1 rounded-md border border-secondary p-1">
-            {(
-              [
-                { key: "map" as const, label: "Karte", icon: MapIcon },
-                { key: "list" as const, label: "Liste", icon: LayoutGrid },
-              ]
-            ).map(({ key, label, icon: Icon }) => (
+          <div className="flex flex-none items-center justify-between gap-1 sm:justify-start">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((open) => !open)}
+              aria-expanded={filtersOpen}
+              aria-controls="job-search-filters"
+              className="flex h-9 items-center gap-1.5 rounded-md border border-secondary px-2.5 text-[13px] font-medium text-text/60 transition-colors hover:bg-muted hover:text-text sm:px-3"
+            >
+              <SlidersHorizontal size={14} strokeWidth={1.9} aria-hidden />
+              <span className="hidden sm:inline">Filter</span>
+              <ChevronDown className={`transition-transform ${filtersOpen ? "rotate-180" : ""}`} size={14} aria-hidden />
+            </button>
+            <div className="flex items-center gap-1 rounded-md border border-secondary p-1">
+              {(
+                [
+                  { key: "map" as const, label: "Karte", icon: MapIcon },
+                  { key: "list" as const, label: "Liste", icon: LayoutGrid },
+                ]
+              ).map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
                 type="button"
@@ -154,13 +176,15 @@ export default function FindOrders() {
                 className="flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[13px] font-medium text-text/55 transition-colors hover:text-text data-[active=true]:bg-primary data-[active=true]:text-white"
               >
                 <Icon size={14} strokeWidth={1.9} aria-hidden />
-                {label}
+                <span className="hidden sm:inline">{label}</span>
               </button>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto_auto]">
+        <div id="job-search-filters" className={filtersOpen ? "block" : "hidden"}>
+          <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto_auto]">
           <div className="field-group field-h">
             <Search size={15} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
             <input
@@ -234,7 +258,7 @@ export default function FindOrders() {
             <X size={14} strokeWidth={2} aria-hidden />
             Zurücksetzen
           </button>
-        </div>
+          </div>
 
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <Tag size={14} strokeWidth={1.8} className="text-text/30" aria-hidden />
@@ -278,6 +302,7 @@ export default function FindOrders() {
         {(locationHint || locationError) && (
           <p className="mt-2.5 text-[12px] text-text/40">{locationError ?? locationHint}</p>
         )}
+        </div>
       </div>
 
       {loading && (
@@ -350,7 +375,7 @@ export default function FindOrders() {
 
       {!loading && !error && viewMode === "map" && (
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <div className="relative" style={{ height: "58%" }}>
+          <div className="job-map relative">
             {mapsReady ? (
               <MapView
                 orders={filtered}
@@ -368,10 +393,10 @@ export default function FindOrders() {
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 border-t border-secondary">
+          <div className="relative flex min-h-0 flex-1 border-t border-secondary">
             <div
-              className={`flex-none overflow-hidden border-r border-secondary transition-all duration-300 ${
-                visibleSelectedOrder ? "w-full sm:w-[340px]" : "w-0"
+              className={`map-detail-panel overflow-hidden border-r border-secondary transition-all duration-300 ${
+                visibleSelectedOrder ? "is-open sm:w-[420px] lg:w-[500px]" : "w-0"
               }`}
             >
               {visibleSelectedOrder && (
@@ -379,7 +404,7 @@ export default function FindOrders() {
               )}
             </div>
 
-            <div ref={listRef} className="flex-1 overflow-y-auto">
+            <div ref={listRef} className="map-results flex-1 overflow-y-auto">
               {filtered.length === 0 ? (
                 <div className="flex h-full items-center justify-center">
                   <p className="text-[13px] text-text/40">Keine Aufträge gefunden.</p>

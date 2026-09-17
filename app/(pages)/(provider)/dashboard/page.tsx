@@ -106,7 +106,27 @@ export default function Dashboard() {
 
       {activeTab === "jobs" && (
         <section className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="sm:hidden">
+            <label
+              htmlFor="job-status-filter"
+              className="mb-1.5 block text-[12px] font-medium text-text/50"
+            >
+              Job-Status
+            </label>
+            <select
+              id="job-status-filter"
+              value={activeJobFilter}
+              onChange={(event) => setActiveJobFilter(event.target.value as JobFilter)}
+              className="field field-select w-full"
+            >
+              {jobFilters.map((filter) => (
+                <option key={filter.key} value={filter.key}>
+                  {filter.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="hidden flex-wrap items-center gap-2 sm:flex">
             {jobFilters.map((chip) => (
               <button
                 key={chip.key}
