@@ -816,6 +816,11 @@
   body { overscroll-behavior-y: none; }
   .app-content { padding-bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom)); }
   .app-viewport { height: calc(100dvh - var(--nav-h) - var(--mobile-nav-h) - env(safe-area-inset-bottom)); }
+  .offer-modal-overlay {
+    inset-block-start: var(--nav-h);
+    inset-block-end: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom));
+    padding-block: 0.75rem;
+  }
   .shell, .shell-wide { padding-inline: 1rem; }
   .page-title { font-size: 23px; }
 
