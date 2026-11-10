@@ -179,6 +179,19 @@ test("a job cannot be forged around the accept transaction", { skip }, async () 
   await assertFails(accept(as("lea"), "anna", ["ben", "cem"]))
 })
 
+test("an order can be edited only until the first offer arrives", { skip }, async () => {
+  const lea = as("lea")
+  const batch = lea.batch()
+  batch.set(lea.doc("orders/o2"), { ...order, customerId: "lea" })
+  batch.set(lea.doc("orders/o2/private/address"), { address: "Venloer Str. 2" })
+  await batch.commit()
+
+  await assertSucceeds(lea.doc("orders/o2").update({ title: "Umzug Ehrenfeld", updatedAt: now }))
+  // o1 already has three offers that answer the order as it was written.
+  await assertFails(as("kim").doc("orders/o1").update({ title: "Doch vier Zimmer", updatedAt: now }))
+  await assertFails(as("kim").doc("orders/o1").update({ budgetInCent: 100, updatedAt: now }))
+})
+
 test("a customer cannot jump their order's status", { skip }, async () => {
   await assertFails(as("kim").doc("orders/o1").update({ status: "completed" }))
   await assertFails(as("kim").doc("orders/o1").update({ assignedProviderId: "anna" }))

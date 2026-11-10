@@ -48,6 +48,19 @@ aus dieser Tabelle.
 | Die Service-Suche verlangte einen Umkreis | Ein Service erscheint, wenn die Adresse des Kunden im Einsatzradius des Anbieters liegt |
 | Kein Impressum, keine Datenschutzerklärung | Beide Seiten angelegt, mit Platzhaltern für die Betreiberdaten |
 
+## Feinschliff
+
+| Befund | Lösung |
+| --- | --- |
+| Die öffentlichen Seiten luden das komplette Firebase-SDK mit | Anmeldung und Firebase starten erst im Layout der App; das JavaScript der Startseite ist halb so groß |
+| Jede Seite mit Kategorieauswahl fragte die Kategorien neu ab | Eine Abfrage pro Besuch |
+| Suche und Auftragsliste lasen jeweils die ganze Sammlung | Auf die 200 neuesten Einträge begrenzt |
+| Kein Weg zurück bei vergessenem Passwort | „Vergessen?" auf der Anmeldeseite |
+| Kein Icon, kein Web-App-Manifest, keine `robots.txt`, keine Sitemap | Angelegt; die App hinter der Anmeldung ist `noindex` |
+| Ohne Benachrichtigungen erfuhr der Kunde nicht von neuen Angeboten | Die Übersicht nennt wartende Angebote und eine fehlende Telefonnummer |
+| Ein Auftrag ließ sich ändern, nachdem Angebote eingegangen waren | Gesperrt, in der Oberfläche und in den Regeln |
+| Aufträge mit vergangenem Termin blieben in der Suche | Ausgeblendet; der Kunde sieht den Hinweis in seiner Liste |
+
 ## Offen
 
 - Impressum und Datenschutz brauchen die echten Angaben und eine rechtliche Prüfung.
@@ -55,6 +68,8 @@ aus dieser Tabelle.
   keine Kontaktdaten in älteren Angeboten. Frisch einspielen oder neu speichern.
 - Die Begrenzung des Adress-Endpunkts zählt pro Serverinstanz. Für hohe Last
   gehört sie an die vorgelagerte Plattform.
+- Die E-Mail zum Zurücksetzen des Passworts verschickt Firebase. Absender und
+  Text lassen sich in der Firebase-Konsole unter Authentication, Templates anpassen.
 - Zahlungen, Bewertungen und Benachrichtigungen gibt es bewusst nicht.
   Absprachen laufen nach der Zusage direkt zwischen beiden Seiten.
 - App Check für Firebase und eine Domain-Beschränkung des Maps-Schlüssels sind

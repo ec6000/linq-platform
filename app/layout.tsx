@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { AuthProvider } from "@/components/auth/AuthProvider";
 import { fontVariables } from "@/lib/fonts";
 import "./globals.css";
 
@@ -31,7 +30,7 @@ export default function RootLayout({
         >
           Zum Inhalt springen
         </a>
-        <AuthProvider>{children}</AuthProvider>
+        {children}
       </body>
     </html>
   );

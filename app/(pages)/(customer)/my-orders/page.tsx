@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Pencil, Plus, X } from "lucide-react"
 import { useMyOrders } from "@/lib/hooks/useOrders"
 import { useOfferActions, useOrderOffers } from "@/lib/hooks/useOffers"
 import { cancelOrder } from "@/lib/data/orders"
-import { OrderStatus, type Order } from "@/lib/types/order"
+import { OrderStatus, hasExpired, type Order } from "@/lib/types/order"
 import { OfferStatus } from "@/lib/types/offer"
 import { formatEuro, formatTimeRange } from "@/lib/utils/format"
 import PageHeader from "@/components/layout/PageHeader"
@@ -20,6 +20,7 @@ export default function CustomerMyOrdersPage() {
   const [cancelling, setCancelling] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [offersOrder, setOffersOrder] = useState<Order | null>(null)
+  const [now] = useState(() => Date.now())
 
   async function handleCancel() {
     if (!cancelTarget) return
@@ -78,6 +79,9 @@ export default function CustomerMyOrdersPage() {
                 <span>{formatTimeRange(order.timeWindow.start, order.timeWindow.end)}</span>
                 <span className="num">{formatEuro(order.budgetInCent, { decimals: false })} € Budget</span>
                 {order.assignedProviderName && <span>an {order.assignedProviderName}</span>}
+                {isOpen && hasExpired(order, now) && (
+                  <span className="font-medium text-text/70">Termin vorbei, für Dienstleister nicht mehr sichtbar</span>
+                )}
               </p>
 
               {isOpen && (
@@ -85,10 +89,12 @@ export default function CustomerMyOrdersPage() {
                   <button type="button" onClick={() => setCancelTarget(order)} className="btn btn-ghost btn-sm">
                     Stornieren
                   </button>
-                  <Link href={`/my-orders/${order.id}/edit`} className="btn btn-ghost btn-sm">
-                    <Pencil size={14} strokeWidth={1.9} aria-hidden />
-                    Bearbeiten
-                  </Link>
+                  {order.offerCount === 0 && (
+                    <Link href={`/my-orders/${order.id}/edit`} className="btn btn-ghost btn-sm">
+                      <Pencil size={14} strokeWidth={1.9} aria-hidden />
+                      Bearbeiten
+                    </Link>
+                  )}
                   <button
                     type="button"
                     disabled={order.offerCount === 0}
@@ -138,6 +144,12 @@ function OffersSheet({ order, onClose }: { order: Order; onClose: () => void }) 
   const pending = offers.filter((offer) => offer.status === OfferStatus.pending)
   // Accepting is binding, so it takes a second, deliberate tap.
   const [confirming, setConfirming] = useState<string | null>(null)
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose()
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [onClose])
 
   async function decide(providerId: string, decision: OfferStatus.accepted | OfferStatus.declined) {
     if ((await resolveOffer(order.id, providerId, decision)) && decision === OfferStatus.accepted) onClose()

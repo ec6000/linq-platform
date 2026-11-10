@@ -1,19 +1,23 @@
 "use client"
 
-import { useMemo } from "react"
-import { collection, doc, orderBy, query, where } from "firebase/firestore"
+import { useMemo, useState } from "react"
+import { collection, doc, limit, orderBy, query, where } from "firebase/firestore"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { db } from "@/lib/firebase/firebase"
 import { decodeDocument } from "@/lib/firebase/documents"
 import { useFirestoreDocument, useFirestoreQuery } from "@/lib/hooks/useFirestoreQuery"
 import { isValidDocumentId } from "@/lib/utils/validation"
-import { OrderStatus, type Order, type PrivateAddress } from "@/lib/types/order"
+import { OrderStatus, hasExpired, type Order, type PrivateAddress } from "@/lib/types/order"
 import { privateAddressRef } from "@/lib/data/orders"
 
 const decode = decodeDocument<Order>
 const MESSAGE = "Aufträge konnten nicht geladen werden."
 
-/** Every order still collecting offers — the provider's job board. */
+/**
+ * The provider's job board: the newest orders still collecting offers, minus
+ * those whose fixed date has already passed. The cap keeps one page load from
+ * ever reading the whole collection.
+ */
 export function useOpenOrders() {
   const source = useMemo(
     () =>
@@ -21,27 +25,34 @@ export function useOpenOrders() {
         collection(db, "orders"),
         where("status", "==", OrderStatus.open),
         orderBy("createdAt", "desc"),
+        limit(200),
       ),
     [],
   )
   const { data, ...state } = useFirestoreQuery(source, decode, MESSAGE)
-  return { orders: data, ...state }
+  const [now] = useState(() => Date.now())
+  const orders = useMemo(
+    () => data.filter((order) => !hasExpired(order, now)),
+    [data, now],
+  )
+  return { orders, ...state }
 }
 
-/** Everything the signed-in customer published, newest first. */
+/** Everything the signed-in customer published, newest first. Providers publish nothing, so they ask nothing. */
 export function useMyOrders() {
   const { user } = useAuth()
   const uid = user?.uid
+  const role = user?.role
   const source = useMemo(
     () =>
-      uid
+      uid && role === "customer"
         ? query(
             collection(db, "orders"),
             where("customerId", "==", uid),
             orderBy("createdAt", "desc"),
           )
         : null,
-    [uid],
+    [uid, role],
   )
   const { data, ...state } = useFirestoreQuery(source, decode, MESSAGE)
   return { orders: data, ...state }
