@@ -82,8 +82,9 @@ service cloud.firestore {
       function order() { return resource.data; }
       function owner() { return signedIn() && order().customerId == uid(); }
 
+      // Once someone has named a price for it, the description stays as it was.
       function edits() {
-        return data().status == 'open' && price(data().budgetInCent)
+        return data().status == 'open' && order().offerCount == 0 && price(data().budgetInCent)
           && text(data().title, 120) && text(data().description, 4000)
           && onlyChanges(['title', 'description', 'budgetInCent', 'place', 'timeWindow', 'categoryId',
                           'categoryName', 'subcategoryId', 'subcategoryName', 'updatedAt']);

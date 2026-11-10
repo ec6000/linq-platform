@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -21,6 +22,7 @@ interface AuthContextValue {
   signUpWithEmail: (params: { email: string; password: string; role: UserRole; displayName: string }) => Promise<AppUser>
   signInWithEmail: (email: string, password: string) => Promise<AppUser>
   signInWithGoogle: (role?: UserRole) => Promise<AppUser>
+  resetPassword: (email: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -31,7 +33,7 @@ export function authErrorMessage(error: unknown) {
   const code = (error as { code?: string } | null)?.code ?? ""
   if (code.includes("email-already-in-use")) return "Für diese E-Mail gibt es schon ein Konto. Bitte melde dich an."
   if (code.includes("weak-password")) return "Das Passwort braucht mindestens 6 Zeichen."
-  if (code.includes("invalid-email")) return "Diese E-Mail-Adresse ist ungültig."
+  if (code.includes("invalid-email") || code.includes("missing-email")) return "Diese E-Mail-Adresse ist ungültig."
   if (code.includes("invalid-credential") || code.includes("wrong-password") || code.includes("user-not-found")) {
     return "E-Mail oder Passwort stimmen nicht."
   }
@@ -114,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { user: signedIn } = await signInWithPopup(auth, googleProvider)
           return finish(signedIn, role)
         }),
+      resetPassword: (email) => sendPasswordResetEmail(auth, email.trim()),
       logout: async () => {
         await signOut(auth)
         setUser(null)

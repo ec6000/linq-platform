@@ -71,3 +71,8 @@ export enum OrderStatus {
   completed = "completed",
   cancelled = "cancelled",
 }
+
+/** A fixed date that has passed: nobody can take this job any more. Flexible orders never expire. */
+export function hasExpired(order: Pick<Order, "timeWindow">, now: number) {
+  return !order.timeWindow.isFlexible && order.timeWindow.end.toMillis() <= now
+}

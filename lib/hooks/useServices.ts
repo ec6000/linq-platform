@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { collection, doc, orderBy, query, where } from "firebase/firestore"
+import { collection, doc, limit, orderBy, query, where } from "firebase/firestore"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { db } from "@/lib/firebase/firebase"
 import { decodeDocument } from "@/lib/firebase/documents"
@@ -12,7 +12,7 @@ import { ServiceStatus, type Service } from "@/lib/types/service"
 const decode = decodeDocument<Service>
 const MESSAGE = "Services konnten nicht geladen werden."
 
-/** All active services, newest first — the public search index. */
+/** The newest active services — the search index, capped so one page load stays cheap. */
 export function useActiveServices() {
   const source = useMemo(
     () =>
@@ -20,6 +20,7 @@ export function useActiveServices() {
         collection(db, "services"),
         where("status", "==", ServiceStatus.active),
         orderBy("createdAt", "desc"),
+        limit(200),
       ),
     [],
   )

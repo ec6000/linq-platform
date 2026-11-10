@@ -2,11 +2,13 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { Plus } from "lucide-react"
+import { ArrowRight, Plus } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useJobs } from "@/lib/hooks/useJobs"
 import { useBookings } from "@/lib/hooks/useBookings"
 import { useProviderOffers } from "@/lib/hooks/useOffers"
+import { useMyOrders } from "@/lib/hooks/useOrders"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import JobCard from "@/components/dashboard/JobCard"
 import BookingCard from "@/components/dashboard/BookingCard"
 import OfferCard from "@/components/dashboard/OfferCard"
@@ -15,6 +17,8 @@ import PageHeader from "@/components/layout/PageHeader"
 import { isTerminalJobStatus } from "@/lib/utils/jobStatus"
 import { BookingStatus } from "@/lib/types/booking"
 import { OfferStatus } from "@/lib/types/offer"
+import { OrderStatus } from "@/lib/types/order"
+import { getProfileForRole } from "@/lib/utils/auth"
 
 type Tab = "jobs" | "requests" | "offers" | "done"
 
@@ -29,7 +33,22 @@ export default function Overview() {
   const jobs = useJobs()
   const bookings = useBookings()
   const offers = useProviderOffers()
+  const { orders } = useMyOrders()
+  const { profile, loading: profileLoading } = useUserProfile(user?.uid)
   const [tab, setTab] = useState<Tab>("jobs")
+
+  // There are no notifications, so the overview says what is waiting elsewhere.
+  const waiting = orders.reduce((sum, order) => sum + (order.status === OrderStatus.open ? order.offerCount : 0), 0)
+  const hints = [
+    waiting > 0 && {
+      href: "/my-orders",
+      text: `${waiting} ${waiting === 1 ? "Angebot wartet" : "Angebote warten"} auf deine Entscheidung.`,
+    },
+    !profileLoading && !profile.phone && {
+      href: getProfileForRole(role),
+      text: "Trag deine Telefonnummer ein, damit ihr euch nach einer Zusage direkt erreicht.",
+    },
+  ].filter((hint) => hint !== false)
 
   const lists = useMemo(
     () => ({
@@ -83,6 +102,13 @@ export default function Overview() {
           )
         }
       />
+
+      {hints.map(({ href, text }) => (
+        <Link key={href} href={href} className="notice notice-info mb-3 flex items-center justify-between gap-3">
+          {text}
+          <ArrowRight size={15} strokeWidth={2} className="flex-none" aria-hidden />
+        </Link>
+      ))}
 
       <div role="tablist" aria-label="Bereiche" className="scrollbar-none -mx-4 mb-7 flex gap-1 overflow-x-auto border-b border-secondary px-4 sm:mx-0 sm:px-0">
         {tabs.map(({ key, label, count }) => (

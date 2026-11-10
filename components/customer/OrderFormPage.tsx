@@ -37,13 +37,13 @@ export default function OrderFormPage({ orderId }: { orderId?: string }) {
     )
   }
 
-  if (error || (orderId && (!order || order.status !== OrderStatus.open))) {
+  if (error || (orderId && (!order || order.status !== OrderStatus.open || order.offerCount > 0))) {
     return (
       <FormShell>
         <div className="empty">
           <h1 className="text-[17px] font-semibold text-text">Dieser Auftrag kann nicht bearbeitet werden.</h1>
           <p className="mx-auto mt-2 max-w-sm text-[14px] leading-relaxed text-text/50">
-            {error ?? "Sobald ein Auftrag vergeben ist, bleiben seine Angaben so, wie sie vereinbart wurden."}
+            {error ?? "Sobald ein Angebot eingegangen ist, bleiben die Angaben so, wie die Dienstleister sie gelesen haben."}
           </p>
           <Link href="/my-orders" className="btn btn-outline mt-7">
             Zu meinen Aufträgen

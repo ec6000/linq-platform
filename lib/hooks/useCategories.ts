@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import type { Category } from "@/lib/types/category"
 import { getCategories } from "@/lib/data/categories"
 
-/** The taxonomy is static, so one fetch per mount is enough — no live listener. */
+/** The taxonomy is static: no live listener, and `getCategories` asks only once per visit. */
 export function useCategories() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)

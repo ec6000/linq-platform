@@ -77,6 +77,11 @@ mitgeführt. Dadurch braucht eine Auftragsliste keinen Subcollection-Read, nur u
 „3 Angebote" anzuzeigen. Die Regeln koppeln den Zähler an das Angebot: er kann
 sich nur um eins ändern, und nur zusammen mit dem eigenen Angebot.
 
+Bearbeiten lässt sich ein Auftrag nur, solange kein Angebot offen ist. Ein
+Angebot antwortet auf den Auftrag, wie er dastand; danach bleibt dem Kunden das
+Stornieren. Aufträge mit festem Termin verschwinden aus der Suche der Anbieter,
+sobald der Termin vorbei ist (`hasExpired`), flexible bleiben stehen.
+
 Öffentlich sichtbar sind der Stadtteil und der abgekürzte Kundenname („Kim M.").
 Mit der Vergabe bekommt der Auftrag `assignedProviderId` und `jobId`.
 

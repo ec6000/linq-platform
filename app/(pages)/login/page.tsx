@@ -9,10 +9,11 @@ import { getHomeForRole } from "@/lib/utils/auth"
 
 export default function LoginPage() {
   const router = useRouter()
-  const { signInWithEmail, signInWithGoogle } = useAuth()
+  const { signInWithEmail, signInWithGoogle, resetPassword } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const handleEmailLogin = async (event: React.FormEvent) => {
@@ -29,6 +30,21 @@ export default function LoginPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  /** Uses the address already typed above; the answer never reveals whether an account exists. */
+  const handleReset = async () => {
+    setError(null)
+    setNotice(null)
+    if (!email.trim()) return setError("Trag oben deine E-Mail ein, dann schicken wir dir einen Link.")
+
+    try {
+      await resetPassword(email)
+    } catch (err) {
+      const code = (err as { code?: string } | null)?.code ?? ""
+      if (!code.includes("user-not-found")) return setError(authErrorMessage(err))
+    }
+    setNotice("Wenn es zu dieser Adresse ein Konto gibt, ist jetzt eine E-Mail mit einem Link unterwegs.")
   }
 
   const handleGoogleLogin = async () => {
@@ -71,9 +87,14 @@ export default function LoginPage() {
         </div>
 
         <div>
-          <label className="field-label" htmlFor="login-password">
-            Passwort
-          </label>
+          <div className="flex items-baseline justify-between">
+            <label className="field-label" htmlFor="login-password">
+              Passwort
+            </label>
+            <button type="button" onClick={handleReset} className="link-quiet text-[12.5px]">
+              Vergessen?
+            </button>
+          </div>
           <input
             id="login-password"
             type="password"
@@ -88,6 +109,11 @@ export default function LoginPage() {
         {error && (
           <p role="alert" className="notice notice-error">
             {error}
+          </p>
+        )}
+        {notice && (
+          <p role="status" className="notice notice-success">
+            {notice}
           </p>
         )}
 

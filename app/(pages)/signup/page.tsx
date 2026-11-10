@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Check, Chrome } from "lucide-react"
 import AuthCard from "@/components/auth/AuthCard"
 import { authErrorMessage, useAuth } from "@/components/auth/AuthProvider"
@@ -189,6 +190,14 @@ export default function SignUpPage() {
         <Chrome size={16} strokeWidth={1.9} aria-hidden />
         Mit Google registrieren
       </button>
+
+      <p className="field-hint mt-5 text-center">
+        Wie wir mit deinen Daten umgehen, steht in der{" "}
+        <Link href="/datenschutz" className="underline hover:text-text">
+          Datenschutzerklärung
+        </Link>
+        .
+      </p>
     </AuthCard>
   )
 }

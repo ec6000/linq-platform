@@ -11,6 +11,7 @@ import {
 import { haversineDistanceInKm } from "../lib/utils/geo"
 import { canChangeJobStatus, getNextJobStatus, isTerminalJobStatus } from "../lib/utils/jobStatus"
 import { JobStatus } from "../lib/types/job"
+import { hasExpired } from "../lib/types/order"
 import { PricingType } from "../lib/types/common"
 import { formatPrice, formatPriceRange, pricingSuffix } from "../lib/utils/format"
 
@@ -94,4 +95,14 @@ test("distance calculation is symmetric and handles identical and antipodal poin
   assert.equal(distance, haversineDistanceInKm(berlin, cologne))
   assert.equal(haversineDistanceInKm(cologne, cologne), 0)
   assert.ok(Number.isFinite(haversineDistanceInKm(cologne, { lat: -cologne.lat, lon: cologne.lon - 180 })))
+})
+
+test("an order leaves the job board once its fixed date has passed, a flexible one stays", () => {
+  const window = (isFlexible: boolean) => ({
+    timeWindow: { isFlexible, end: { toMillis: () => 1_000 } },
+  }) as Parameters<typeof hasExpired>[0]
+
+  assert.equal(hasExpired(window(false), 999), false)
+  assert.equal(hasExpired(window(false), 1_000), true)
+  assert.equal(hasExpired(window(true), 5_000), false)
 })

@@ -90,6 +90,8 @@ export async function updateOrder(orderId: string, input: OrderInput) {
     const current = (await transaction.get(ref)).data()
     if (!current || current.customerId !== user.uid) throw new Error("Auftrag nicht gefunden.")
     if (current.status !== OrderStatus.open) throw new Error("Nur offene Aufträge können bearbeitet werden.")
+    // An offer answers the order as it was written; changing it afterwards would move the ground under the price.
+    if (current.offerCount > 0) throw new Error("Zu diesem Auftrag gibt es schon Angebote. Er lässt sich nicht mehr ändern.")
     transaction.update(ref, { ...order, updatedAt: serverTimestamp() })
     transaction.set(privateAddressRef(orderId), address)
   })
