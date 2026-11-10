@@ -10,6 +10,12 @@ export function parseEuroInCent(value: string): number {
   return cents
 }
 
+/** The inverse of parseEuroInCent, for prefilling an input: 1250 → "12,50", 1200 → "12". */
+export function centsToInput(cents: number | undefined) {
+  if (cents === undefined) return ""
+  return (cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2)).replace(".", ",")
+}
+
 export function assertMoney(value: number): void {
   if (!Number.isSafeInteger(value) || value < 0 || value > MAX_MONEY_IN_CENT) {
     throw new Error("Der Betrag muss eine gültige, nicht negative Cent-Summe sein.")

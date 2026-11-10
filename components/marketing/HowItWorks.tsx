@@ -4,18 +4,18 @@ import SectionHeading from "./SectionHeading";
 const steps = [
   {
     step: "01",
-    title: "Auftrag beschreiben",
-    text: "In wenigen Feldern sagst du, was gemacht werden soll, wo und wann. Dauert keine zwei Minuten.",
+    title: "Umzug beschreiben",
+    text: "Was getragen werden soll, wo und wann. Dauert keine zwei Minuten.",
   },
   {
     step: "02",
-    title: "Angebote erhalten",
-    text: "Passende Dienstleister aus Köln reagieren mit Preis und Vorschlag. Du vergleichst in Ruhe.",
+    title: "Preise vergleichen",
+    text: "Helfer aus Köln schicken dir ihren Preis. Du vergleichst in Ruhe und sagst einem zu.",
   },
   {
     step: "03",
-    title: "Direkt umsetzen",
-    text: "Termin bestätigen, Leistung erledigen, fertig. Alles an einem Ort – transparent und ohne Umwege.",
+    title: "Direkt loslegen",
+    text: "Mit der Zusage bekommt ihr gegenseitig Telefon und E-Mail. Den Rest klärt ihr direkt.",
   },
 ];
 
@@ -27,8 +27,8 @@ export default function HowItWorks() {
           <SectionHeading
             id="how-heading"
             eyebrow="So funktioniert's"
-            title="Drei Schritte bis zur erledigten Aufgabe."
-            description="Wir haben LiNQ so einfach gemacht wie möglich – damit der eigentliche Job wieder im Mittelpunkt steht."
+            title="Drei Schritte bis zum erledigten Umzug."
+            description="So einfach wie möglich, damit der eigentliche Umzug im Mittelpunkt steht."
             align="center"
           />
         </Reveal>

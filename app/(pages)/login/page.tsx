@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Chrome } from "lucide-react"
 import AuthCard from "@/components/auth/AuthCard"
-import { useAuth } from "@/components/auth/AuthProvider"
+import { authErrorMessage, useAuth } from "@/components/auth/AuthProvider"
 import { getHomeForRole } from "@/lib/utils/auth"
 
 export default function LoginPage() {
@@ -25,7 +25,7 @@ export default function LoginPage() {
       router.replace(getHomeForRole(appUser.role))
     } catch (err) {
       console.error(err)
-      setError("Login fehlgeschlagen. Bitte Daten prüfen.")
+      setError(authErrorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -40,7 +40,7 @@ export default function LoginPage() {
       router.replace(getHomeForRole(appUser.role))
     } catch (err) {
       console.error(err)
-      setError("Google Login fehlgeschlagen.")
+      setError(authErrorMessage(err))
     } finally {
       setLoading(false)
     }

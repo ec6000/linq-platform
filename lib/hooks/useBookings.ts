@@ -59,12 +59,12 @@ export function useRespondToBooking() {
   async function respond(
     bookingId: string,
     decision: BookingStatus.accepted | BookingStatus.declined,
-    message?: string,
+    details?: { priceInCent?: number; message?: string },
   ) {
     setLoading(true)
     setError(null)
     try {
-      await respondToBooking(bookingId, decision, message)
+      await respondToBooking(bookingId, decision, details)
       return true
     } catch (err) {
       console.error(err)

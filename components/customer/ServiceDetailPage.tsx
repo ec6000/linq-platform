@@ -1,23 +1,13 @@
 "use client"
 
-import Image from "next/image"
+import ServiceImage from "@/components/ServiceImage"
 import Link from "next/link"
 import { useState } from "react"
-import {
-  ArrowLeft,
-  BadgeCheck,
-  CalendarClock,
-  CheckCircle2,
-  Euro,
-  ImageIcon,
-  Loader2,
-  MapPin,
-  MessageSquare,
-  ShieldCheck,
-} from "lucide-react"
+import { ArrowLeft, CalendarClock, CheckCircle2, Euro, MapPin, MessageSquare } from "lucide-react"
 import { useService } from "@/lib/hooks/useServices"
 import { useCreateBooking } from "@/lib/hooks/useBookings"
 import { formatEuro, formatPriceRange } from "@/lib/utils/format"
+import { parseEuroInCent } from "@/lib/utils/validation"
 
 export default function ServiceDetailPage({ serviceId }: { serviceId: string }) {
   const { service, loading, error } = useService(serviceId)
@@ -35,12 +25,13 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
     if (!service) return
     setValidationError(null)
 
-    const trimmed = priceInput.trim()
-    const priceInCent = trimmed ? Math.round(Number(trimmed.replace(",", ".")) * 100) : undefined
-    if (priceInCent !== undefined && (!Number.isFinite(priceInCent) || priceInCent <= 0)) {
-      setValidationError("Bitte gib einen gültigen Preisvorschlag ein oder lasse das Feld leer.")
-      return
+    let priceInCent: number | undefined
+    try {
+      priceInCent = priceInput.trim() ? parseEuroInCent(priceInput) : undefined
+    } catch {
+      return setValidationError("Bitte einen gültigen Preisvorschlag eingeben oder das Feld leer lassen.")
     }
+    if (priceInCent === 0) priceInCent = undefined
 
     const bookingId = await submit({
       serviceId: service.id,
@@ -108,22 +99,13 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_0.8fr]">
         <section className="card overflow-hidden">
-          <div className="relative h-[300px] bg-muted md:h-[420px]">
-            {service.imageUrl ? (
-              <Image
-                src={service.imageUrl}
-                alt={service.title}
-                fill
-                priority
-                sizes="(min-width: 1024px) 62vw, 100vw"
-                className="object-cover"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-text/20">
-                <ImageIcon size={32} strokeWidth={1.4} aria-hidden />
-              </div>
-            )}
-          </div>
+          <ServiceImage
+            src={service.imageUrl}
+            sizes="(min-width: 1024px) 62vw, 100vw"
+            iconSize={32}
+            priority
+            className="h-[300px] md:h-[420px]"
+          />
 
           <div className="p-6 md:p-9">
             <div className="flex flex-wrap items-center gap-2">
@@ -131,10 +113,6 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
               {service.subcategoryName && (
                 <span className="pill pill-muted">{service.subcategoryName}</span>
               )}
-              <span className="pill pill-accent">
-                <ShieldCheck size={12} strokeWidth={2} aria-hidden />
-                Geprüfter Anbieter
-              </span>
             </div>
 
             <h1 className="display mt-6 text-[32px] text-primary md:text-[44px]">{service.title}</h1>
@@ -153,18 +131,9 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
               ))}
             </dl>
 
-            <div className="card-sunken mt-6 p-6">
-              <h2 className="flex items-center gap-2 text-[16px] font-semibold text-text">
-                <BadgeCheck size={17} strokeWidth={1.9} className="text-accent-ink" aria-hidden />
-                Anbieter
-              </h2>
-              <p className="mt-2 text-[15px] text-text/70">{service.providerName}</p>
-              <ul className="mt-5 grid gap-2 text-[13.5px] text-text/55 sm:grid-cols-3">
-                <li>Identität geprüft</li>
-                <li>Transparenter Preisrahmen</li>
-                <li>Anfrage unverbindlich</li>
-              </ul>
-            </div>
+            <p className="mt-6 text-[14px] text-text/55">
+              Angeboten von <span className="font-medium text-text">{service.providerName}</span>
+            </p>
           </div>
         </section>
 
@@ -172,13 +141,19 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
           <form onSubmit={handleSubmit} className="card bg-background p-6 shadow-sm md:p-7">
             <h2 className="text-[19px] font-semibold text-text">Service anfragen</h2>
             <p className="mt-1.5 text-[13.5px] leading-relaxed text-text/55">
-              Unverbindlich und kostenlos. Der Anbieter meldet sich direkt bei dir.
+              Kostenlos und unverbindlich. Nimmt der Anbieter an, nennt er den Preis und ihr bekommt gegenseitig eure Kontaktdaten.
             </p>
 
             {createdBookingId && (
-              <p className="notice notice-success mt-5 flex items-center gap-2">
-                <CheckCircle2 size={16} strokeWidth={2} aria-hidden />
-                Anfrage gesendet. Der Anbieter antwortet dir in Kürze.
+              <p className="notice notice-success mt-5 flex items-start gap-2">
+                <CheckCircle2 size={16} strokeWidth={2} className="mt-0.5 flex-none" aria-hidden />
+                <span>
+                  Anfrage gesendet. Die Antwort siehst du in deiner{" "}
+                  <Link href="/customer-dashboard" className="font-semibold underline">
+                    Übersicht
+                  </Link>
+                  .
+                </span>
               </p>
             )}
 
@@ -200,7 +175,7 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
 
               <div>
                 <label className="field-label" htmlFor="booking-address">
-                  Adresse / Einsatzort
+                  Einsatzort
                 </label>
                 <div className="field-group field-h">
                   <MapPin size={15} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
@@ -208,7 +183,7 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
                     id="booking-address"
                     value={addressText}
                     onChange={(event) => setAddressText(event.target.value)}
-                    placeholder={service.place.city}
+                    placeholder="Straße und Hausnummer"
                   />
                 </div>
               </div>
@@ -256,10 +231,8 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
             )}
 
             <button type="submit" disabled={saving} className="btn btn-primary btn-lg btn-block mt-6">
-              {saving && <Loader2 className="animate-spin" size={16} aria-hidden />}
-              Anfrage senden
+              {saving ? "Wird gesendet…" : "Anfrage senden"}
             </button>
-            <p className="mt-3 text-center text-[12px] text-text/40">Kostenlos und unverbindlich</p>
           </form>
         </aside>
       </div>

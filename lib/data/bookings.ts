@@ -3,6 +3,7 @@
 import { Timestamp, doc, runTransaction, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase/firebase"
 import { requireAppUser } from "@/lib/firebase/currentUser"
+import { contactOf } from "@/lib/utils/auth"
 import { assertMoney, newId, withoutUndefined } from "@/lib/utils/validation"
 import { BookingStatus } from "@/lib/types/booking"
 import { ServiceStatus } from "@/lib/types/service"
@@ -46,6 +47,7 @@ export async function createBooking(input: BookingInput) {
         serviceTitle: service.title,
         customerId: user.uid,
         customerName: user.displayName,
+        customerContact: contactOf(user),
         providerId: service.providerId,
         providerName: service.providerName,
         categoryId: service.categoryId,
@@ -69,13 +71,14 @@ export async function createBooking(input: BookingInput) {
 }
 
 /**
- * Accepting a booking is the hinge of flow A: it creates the job and links it
- * back to the booking in one transaction.
+ * Accepting a booking is the hinge of flow A: the provider confirms the final
+ * price, and the job is created and linked back to the booking in one
+ * transaction. A job without an agreed price cannot exist.
  */
 export async function respondToBooking(
   bookingId: string,
   decision: BookingStatus.accepted | BookingStatus.declined,
-  message = "",
+  { priceInCent, message = "" }: { priceInCent?: number; message?: string } = {},
 ) {
   const user = await requireAppUser("provider")
 
@@ -95,7 +98,7 @@ export async function respondToBooking(
       return null
     }
 
-    const priceInCent = booking.priceInCent ?? 0
+    if (priceInCent === undefined || priceInCent <= 0) throw new Error("Bitte den vereinbarten Preis angeben.")
     assertMoney(priceInCent)
 
     const jobId = newId()
@@ -106,8 +109,10 @@ export async function respondToBooking(
         sourceId: bookingId,
         customerId: booking.customerId,
         customerName: booking.customerName,
+        customerContact: booking.customerContact,
         providerId: booking.providerId,
         providerName: booking.providerName,
+        providerContact: contactOf(user),
         title: booking.serviceTitle,
         description: booking.message,
         categoryId: booking.categoryId,
@@ -116,6 +121,7 @@ export async function respondToBooking(
         priceInCent,
         place: booking.place,
         scheduledAt: Timestamp.now(),
+        dateText: booking.requestedDateText || undefined,
         status: JobStatus.scheduled,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -124,6 +130,7 @@ export async function respondToBooking(
 
     transaction.update(ref, {
       status: BookingStatus.accepted,
+      priceInCent,
       jobId,
       acceptedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

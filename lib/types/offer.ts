@@ -1,5 +1,5 @@
 import type { Timestamp } from "firebase/firestore"
-import type { DocumentMeta } from "./common"
+import type { Contact, DocumentMeta } from "./common"
 
 /**
  * A provider's bid on an order.
@@ -17,13 +17,12 @@ export interface Offer extends DocumentMeta {
 
   providerId: string
   providerName: string
+  providerContact?: Contact
 
   priceInCent: number
   message: string
 
   status: OfferStatus
-  /** What the customer wrote when accepting or declining. */
-  customerComment?: string
   decidedAt?: Timestamp
 }
 
@@ -31,10 +30,4 @@ export enum OfferStatus {
   pending = "pending",
   accepted = "accepted",
   declined = "declined",
-}
-
-export const OFFER_STATUS_LABEL: Record<OfferStatus, string> = {
-  [OfferStatus.pending]: "Offen",
-  [OfferStatus.accepted]: "Angenommen",
-  [OfferStatus.declined]: "Abgelehnt",
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { Euro, X } from "lucide-react"
 import { parseEuroInCent } from "@/lib/utils/validation"
 import { useOfferActions } from "@/lib/hooks/useOffers"
+import { MAX_OFFER_MESSAGE as MAX_MESSAGE_LENGTH } from "@/lib/data/offers"
 
 interface OfferModalProps {
   orderId: string
@@ -13,7 +14,6 @@ interface OfferModalProps {
   onSuccess?: () => void
 }
 
-const MAX_MESSAGE_LENGTH = 500
 
 export default function OfferModal({
   orderId,
@@ -129,7 +129,7 @@ export default function OfferModal({
             id="offer-message"
             rows={3}
             maxLength={MAX_MESSAGE_LENGTH}
-            placeholder="Warum bist du der Richtige für diesen Auftrag?"
+            placeholder="z. B. Zwei Helfer mit Transporter, Samstag ab 9 Uhr."
             value={message}
             onChange={(event) => setMessage(event.target.value)}
             className="field resize-none"

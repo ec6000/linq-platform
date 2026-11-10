@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react"
 import type { Coordinates } from "@/lib/utils/geo"
 
-export type LocationSuggestion = Coordinates & { label: string }
+/** `area` is the district a list may show, e.g. "Köln Sülz" — never the street. */
+export type LocationSuggestion = Coordinates & { label: string; area: string }
 const EMPTY: LocationSuggestion[] = []
 
 export function useLocationSuggestions(query: string, selected: LocationSuggestion | null) {
@@ -15,7 +16,7 @@ export function useLocationSuggestions(query: string, selected: LocationSuggesti
     const controller = new AbortController()
     const timeout = setTimeout(async () => {
       try {
-        const response = await fetch(`/api/geoapify/autocomplete?text=${encodeURIComponent(text)}&limit=5`, { signal: controller.signal })
+        const response = await fetch(`/api/geoapify/autocomplete?text=${encodeURIComponent(text)}`, { signal: controller.signal })
         if (!response.ok) throw new Error("Autocomplete failed")
         const data = await response.json() as { results?: LocationSuggestion[] }
         if (!controller.signal.aborted) setState({ text, suggestions: data.results ?? EMPTY, error: null })

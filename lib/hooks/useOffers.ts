@@ -104,8 +104,8 @@ export function useOfferActions() {
       "Angebot konnte nicht zurückgezogen werden.",
     ),
     resolveOffer: run(
-      (orderId: string, providerId: string, decision: OfferStatus.accepted | OfferStatus.declined, comment?: string) =>
-        decideOffer(orderId, providerId, decision, comment),
+      (orderId: string, providerId: string, decision: OfferStatus.accepted | OfferStatus.declined) =>
+        decideOffer(orderId, providerId, decision),
       "Angebot konnte nicht geändert werden.",
     ),
   }

@@ -10,6 +10,7 @@ export interface AppUser {
   uid: string
   email: string
   displayName: string
+  phone: string
   role: UserRole
 }
 
@@ -22,9 +23,15 @@ export interface UserDoc {
   email: string
   phone: string
   company: string
-  notificationsEnabled: boolean
 }
 
 export function fullName(user: Pick<UserDoc, "firstName" | "lastName">) {
   return `${user.firstName} ${user.lastName}`.trim()
+}
+
+/** "Kim Müller" → "Kim M." — enough for a public listing, not enough to look someone up. */
+export function shortName(name: string) {
+  const [first = "", ...rest] = name.trim().split(/\s+/)
+  const last = rest.at(-1)
+  return last ? `${first} ${last.charAt(0)}.` : first
 }

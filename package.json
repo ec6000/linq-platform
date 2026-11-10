@@ -9,6 +9,7 @@
     "lint": "eslint --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "node scripts/test.mjs",
+    "test:rules": "pnpm dlx firebase-tools@14 emulators:exec --only firestore --project demo-linq \"node scripts/test.mjs\"",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "db:seed": "tsx scripts/seed.ts",
     "db:reset": "tsx scripts/resetDb.ts",
@@ -23,6 +24,7 @@
     "react-dom": "19.2.3"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/google.maps": "^3.66.3",
     "@types/node": "^20.19.43",

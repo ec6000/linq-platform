@@ -1,106 +1,95 @@
 # LiNQ
 
-Next.js-App für lokale Dienstleistungen in Köln. Kunden veröffentlichen Aufträge oder fragen Services an; Anbieter verwalten Services, Angebote, Buchungen und Jobs.
+Umzugshilfe in Köln, direkt von Helfern aus dem Veedel. Kunden beschreiben, was ansteht, Dienstleister schicken ihren Preis, und mit der Zusage tauschen beide ihre Kontaktdaten aus.
+
+Next.js (App Router), Firebase Auth und Firestore. Kein eigener Server außer einem Endpunkt für Adressvorschläge.
+
+## Die zwei Wege zu einem Job
+
+```
+Weg A   Service → Anfrage → Job     Der Kunde fragt einen veröffentlichten Service an,
+                                    der Anbieter nimmt an und nennt den Preis.
+Weg B   Auftrag → Angebot → Job     Der Kunde schreibt einen Auftrag aus,
+                                    Anbieter bieten, der Kunde nimmt ein Angebot an.
+```
+
+Beide Seiten haben dieselbe **Übersicht** mit ihren Jobs, Anfragen und Erledigtem. Der Anbieter startet und beendet einen Job, der Kunde kann ihn stornieren, solange er nicht begonnen hat.
 
 ## Lokal starten
 
-Node.js 22 und pnpm 10.34.4 verwenden. Die Prüfungen dieses Durchlaufs liefen lokal mit Node.js 20.17; CI verwendet Node.js 22.
+Node.js 22 und pnpm 10.
 
-```powershell
+```bash
 pnpm install --frozen-lockfile
-Copy-Item .env.local.example .env.local
-# Eigene Firebase- und Geoapify-Werte in .env.local eintragen.
+cp .env.local.example .env.local   # eigene Werte eintragen
 pnpm dev
 ```
 
-Eine bereits vorhandene `.env.local` nicht überschreiben. Secrets und Service-Account-Dateien werden nicht eingecheckt.
-
 | Variable | Verwendung |
 | --- | --- |
-| `NEXT_PUBLIC_FIREBASE_*` | Firebase-Web-App; Auth und Firestore müssen im Projekt konfiguriert sein |
-| `GEOAPIFY_API_KEY` | Nur auf dem Server; Ortsvorschläge für Köln |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Optional; ohne Schlüssel bleibt die Listenansicht nutzbar |
-| `NEXT_PUBLIC_SITE_URL` | Öffentliche Basis-URL für SEO; vor Veröffentlichung auf die tatsächliche Domain setzen |
+| `NEXT_PUBLIC_FIREBASE_*` | Firebase-Web-App mit Auth (E-Mail, Google) und Firestore |
+| `GEOAPIFY_API_KEY` | Nur auf dem Server: Adressvorschläge für Köln |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Optional. Ohne Schlüssel bleibt die Listenansicht der Aufträge nutzbar |
+| `NEXT_PUBLIC_SITE_URL` | Öffentliche Basis-URL für SEO |
+| `NEXT_PUBLIC_FIREBASE_EMULATOR` | `true` verbindet die App mit dem lokalen Emulator statt mit der Cloud |
 
-Browser-Schlüssel sind öffentlich. Den Maps-Schlüssel bei Google auf die eigenen Domains und die Maps JavaScript API einschränken. Firebase-Zugriffe benötigen unabhängig davon Security Rules.
+### Ohne Cloud-Projekt ausprobieren
 
-## Prüfen und bauen
-
-```powershell
-pnpm check
-pnpm build
-pnpm audit --prod
-pnpm audit
+```bash
+firebase emulators:start --project demo-linq                    # Terminal 1
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 \
+FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
+GCLOUD_PROJECT=demo-linq pnpm db:seed                            # Terminal 2
+NEXT_PUBLIC_FIREBASE_EMULATOR=true pnpm dev
 ```
 
-`check` führt ESLint ohne tolerierte Warnungen, die Next-Routentypgenerierung, TypeScript und die Regressionstests aus. Der Test-Runner funktioniert unter Windows und Linux ohne Shell-Globs.
+Der Seed legt zwölf Demo-Konten an (sechs Kunden, sechs Anbieter) und gibt das gemeinsame Passwort am Ende aus. Mehr dazu in [docs/data-model.md](docs/data-model.md).
 
-Der Build lädt Expletus Sans über `next/font/google`. Für einen frischen Build ist Zugang zu Google Fonts erforderlich; die ausgelieferte Schrift wird von Next.js selbst gehostet. Die zentrale Definition liegt in `lib/fonts.ts`. Für vollständig netzwerkunabhängige Builds muss die Schrift samt Lizenz lokal eingebunden werden.
+## Prüfen
 
-`.github/workflows/check.yml` führt die Checks und den Build mit Firebase-Demokonfiguration aus. Diese Konfiguration führt keine Cloud-Schreibtests aus.
+```bash
+pnpm check        # ESLint, TypeScript, Tests
+pnpm test:rules   # dieselben Tests plus die Firestore-Regeln im Emulator (braucht Java)
+pnpm build
+```
+
+`.github/workflows/check.yml` führt `check`, `build` und `pnpm audit` bei jedem Push aus.
 
 ## Struktur
 
 | Verzeichnis | Verantwortung |
 | --- | --- |
-| `app/` | Routen, Layouts, Fehlerseiten und serverseitiger Geoapify-Endpunkt |
-| `components/` | Darstellung und Formularzustand; gemeinsam genutztes Profil- und Ortsformular |
-| `lib/hooks/` | React-Abonnements und UI-Zustand |
-| `lib/data/` | Schreibabläufe für Aufträge, Angebote, Jobs, Services und Buchungen |
-| `lib/firebase/` | Firebase-Verbindung, Dokument-IDs, Sitzungsprüfung |
+| `app/` | Routen, Layouts, das Designsystem (`globals.css`) und der Geoapify-Endpunkt |
+| `components/` | Darstellung und Formularzustand |
+| `lib/data/` | Alle Schreibabläufe. Jeder mehrteilige Schritt ist eine Transaktion |
+| `lib/hooks/` | Echtzeit-Abos auf Firestore (`useFirestoreQuery`) und UI-Zustand |
 | `lib/types/` | Fachliche Typen |
-| `lib/utils/` | Validierung, Statusübergänge, Entfernungen und Kategorien |
-| `scripts/` | Test-Runner und bewusst auszuführende Testdaten-Seeds |
-| `tests/` | Regressionstests ohne Live-Datenbankzugriff |
+| `lib/utils/` | Validierung, Statusübergänge, Formatierung, Entfernungen |
+| `scripts/` | Demo-Daten und Test-Runner |
+| `tests/` | Regressionstests, darunter `rules.test.ts` für die Security Rules |
 
-Abfragen werden in `useFirestoreQuery` abonniert und beim Unmount abgemeldet. Abfragewechsel zeigen keine Ergebnisse des vorherigen Nutzers. Neue Abfragen müssen per `useMemo` stabilisiert werden; Decoder gehören außerhalb des Hooks.
+Ein paar Bausteine tragen die ganze Oberfläche, und neue Seiten sollten sie wiederverwenden statt eigene zu bauen:
 
-Datenoperationen prüfen Sitzung, Rolle und Eigentümer für konsistente Fehlermeldungen. **Diese Browserprüfungen ersetzen keine Firestore Security Rules.**
+- `StatusPill` kennt jeden Status aller vier Dokumentarten und seine deutsche Bezeichnung.
+- `ListState` zeigt Laden, Fehler und Leerzustand für jede Liste.
+- `Overview` ist die Übersicht für beide Rollen; `JobCard` und `BookingCard` bekommen nur die Rolle mitgeteilt.
+- `LocationField` ist das einzige Adressfeld, `CategoryFields` die einzige Kategorieauswahl.
+- `ConfirmationModal` ist der einzige Bestätigungsdialog und nimmt bei Bedarf ein Eingabefeld auf.
 
-## Datenkonventionen
+## Sicherheit in drei Sätzen
 
-- `users/{firebaseUid}` enthält die eindeutige numerische `id` sowie `role`.
-- Aufträge, Services, Buchungen und Jobs verwenden numerische `id`-Felder und dezimale Dokument-IDs. `firestoreId` wird beim Lesen ergänzt.
-- Geldbeträge sind ganzzahlige Cent-Beträge. Koordinaten sind Firestore-`GeoPoint`, Zeitpunkte Firestore-`Timestamp`.
-- Neue Angebote liegen unter `orders/{orderId}/offers/{providerId}`. Alte zufällige Angebots-IDs bleiben lesbar.
-- ID-Zähler und neue Dokumente werden zusammen angelegt. Ein veralteter Zähler verursacht einen Fehler statt Datenverlust.
-- Angebotsannahme schreibt Angebot, Auftragsvergabe und neuen Job in einer Transaktion. Die Annahme zweier Angebote für denselben Auftrag wird dadurch verhindert.
-- Jobstart, Abschluss und Stornierung aktualisieren bei auftragsbasierten Jobs auch den zugehörigen Auftrag.
-- Offene Aufträge werden storniert statt samt Historie gelöscht. Vergebene Aufträge lassen sich nicht mehr über das Auftragsformular bearbeiten.
-- Buchungsannahme bestätigt derzeit die Anfrage; Preisverhandlung und Umwandlung einer Servicebuchung in einen Job sind noch kein vollständiger Produktablauf.
+Der Browser prüft Eingaben nur für gute Fehlermeldungen. Die eigentliche Grenze sind die [Firestore-Regeln](firestore.rules): Sie binden zusammengehörige Schreibvorgänge aneinander, sodass ein Job nur aus einer echten Zusage entstehen kann und niemand einen Status, einen Preis oder einen Zähler frei setzen kann. Die genaue Adresse eines Auftrags liegt in einem eigenen, privaten Dokument und erreicht den Anbieter erst mit der Zusage.
 
-Bestehende Daten werden durch die Bereinigung nicht migriert. Vor einem Rollout Zähler, numerische Nutzerzuordnungen, alte `0,0`-Standorte und bereits doppelte Angebote prüfen.
+Regeln und Indizes ausrollen:
 
-## Firestore-Konfiguration
-
-Die tatsächlich deployed Security Rules liegen diesem Repository nicht bei und wurden nicht verändert. Vor Produktivbetrieb müssen Regeln für Eigentümer, unveränderbare Nutzer-ID/Rolle, zulässige Statusübergänge und atomare Mehrdokumentänderungen versioniert und mit dem Emulator getestet werden.
-
-Für `collectionGroup("offers")` wird ein Gruppenindex auf `providerId` benötigt. `firestore.indexes.json` enthält dessen Definition. Diese Datei in die bestehende Firebase-Deploymentkonfiguration übernehmen und mit vorhandenen Indizes zusammenführen; sie wurde nicht deployed.
-
-Die bisherigen Collections `Categories` und `categories` werden aus Kompatibilitätsgründen weiter unterstützt. Die großgeschriebene Collection hat wie bisher Vorrang. Bei einer späteren Migration einen einzigen Namen festlegen.
-
-## Testdaten
-
-Seeds verwenden Admin-Zugriff und gehören in eine separate, leere Testdatenbank. Für den Emulator:
-
-```powershell
-$env:FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080"
-$env:GCLOUD_PROJECT = "demo-linq"
-pnpm seed:categories
-pnpm seed:services
-pnpm seed:orders
-pnpm seed:jobs
-pnpm seed:bookings
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
 ```
 
-Der Emulator muss separat laufen. Die Skripte starten ihn nicht und ändern keine Client-Konfiguration. Ohne Emulator ist eine explizite Projektbestätigung erforderlich:
+## Vor dem Livegang
 
-```powershell
-pnpm seed:categories --confirm-project mein-testprojekt
-```
+- **Impressum und Datenschutz** enthalten Platzhalter in eckigen Klammern. Beide Seiten brauchen die echten Angaben und eine rechtliche Prüfung.
+- **Bestehende Daten** aus der Zeit vor der Trennung von Adresse und Stadtteil enthalten noch volle Adressen in öffentlichen Dokumenten. Am einfachsten `pnpm db:seed` auf einer frischen Datenbank, sonst Aufträge und Services einmal neu speichern.
+- **Schlüssel einschränken:** Den Google-Maps-Schlüssel auf die eigene Domain begrenzen und für die Firebase-Web-App App Check erwägen.
 
-Dafür muss `serviceAccountKey.json` zu genau diesem Projekt gehören. Die Seeds verwenden Create-Preconditions und überschreiben vorhandene Dokumente oder Zähler nicht. Kategorien werden je Kategorie als Batch geschrieben; bei einem späteren Fehler können frühere Kategorien bereits vorhanden sein. Numerische Seed-Nutzer sind Beispieldaten und müssen zu den Testkonten passen.
-
-## Prüfergebnis und offene Punkte
-
-Details und Grenzen der Bereinigung stehen in [docs/project-audit.md](docs/project-audit.md). Insbesondere Firebase-Autorisierung und vollständige Abläufe mit zwei realen Testkonten sind vor einem Produktivstart zusätzlich zu prüfen.
+Der vollständige Befund der letzten Durchsicht steht in [docs/project-audit.md](docs/project-audit.md).

@@ -1,8 +1,12 @@
 "use client"
 
 import { GeoPoint } from "firebase/firestore"
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import LocationField from "@/components/LocationField"
+import CategoryFields from "@/components/CategoryFields"
+import { findCategory, findSubcategory } from "@/lib/types/category"
+import type { LocationSuggestion } from "@/lib/hooks/useLocationSuggestions"
+import { centsToInput, parseEuroInCent } from "@/lib/utils/validation"
 import { useCategories } from "@/lib/hooks/useCategories"
 import { PricingType } from "@/lib/types/common"
 import { ServiceStatus, type Service } from "@/lib/types/service"
@@ -27,9 +31,8 @@ interface FormState {
   minEuro: string
   maxEuro: string
   radiusKm: string
-  address: string
-  city: string
-  geo: GeoPoint | null
+  placeText: string
+  place: LocationSuggestion | null
   categoryId: string
   subcategoryId: string
 }
@@ -45,11 +48,10 @@ function toFormState(service?: Service | null): FormState {
       unitLabel: "",
       minEuro: "",
       maxEuro: "",
-      radiusKm: "20",
-      address: "",
-      city: "",
-      geo: null,
-      categoryId: "",
+      radiusKm: "15",
+      placeText: "",
+      place: null,
+      categoryId: "moving",
       subcategoryId: "",
     }
   }
@@ -61,21 +63,19 @@ function toFormState(service?: Service | null): FormState {
     status: service.status,
     pricingType: service.pricing.type,
     unitLabel: service.pricing.unitLabel ?? "",
-    minEuro: String(service.minPriceInCent / 100),
-    maxEuro: String(service.maxPriceInCent / 100),
+    minEuro: centsToInput(service.minPriceInCent),
+    maxEuro: centsToInput(service.maxPriceInCent),
     radiusKm: String(service.radiusKm),
-    address: service.place.address,
-    city: service.place.city,
-    geo: service.place.geo,
+    placeText: service.place.address,
+    place: {
+      label: service.place.address,
+      area: service.place.city,
+      lat: service.place.geo.latitude,
+      lon: service.place.geo.longitude,
+    },
     categoryId: service.categoryId,
     subcategoryId: service.subcategoryId ?? "",
   }
-}
-
-/** "Venloer Str. 12, Köln Ehrenfeld" → "Köln Ehrenfeld" */
-function cityFromLabel(label: string) {
-  const parts = label.split(",").map((part) => part.trim()).filter(Boolean)
-  return parts.length > 1 ? parts[parts.length - 1] : label
 }
 
 export default function ServiceForm({
@@ -89,11 +89,6 @@ export default function ServiceForm({
   const [values, setValues] = useState<FormState>(() => toFormState(initialService))
   const [error, setError] = useState<string | null>(null)
 
-  const category = useMemo(
-    () => categories.find((entry) => entry.id === values.categoryId),
-    [categories, values.categoryId],
-  )
-  const subcategories = category?.subcategories ?? []
   const showUnitLabel = values.pricingType === PricingType.unit
 
   function set<K extends keyof FormState>(field: K, value: FormState[K]) {
@@ -104,25 +99,17 @@ export default function ServiceForm({
     event.preventDefault()
     setError(null)
 
-    const minPriceInCent = Math.round(Number(values.minEuro.replace(",", ".")) * 100)
-    const maxPriceInCent = Math.round(Number(values.maxEuro.replace(",", ".")) * 100)
+    const category = findCategory(categories, values.categoryId)
+    const subcategory = findSubcategory(categories, values.categoryId, values.subcategoryId)
     const radiusKm = Number(values.radiusKm)
-    const subcategory = subcategories.find((entry) => entry.slug === values.subcategoryId)
+    const { place } = values
 
-    if (!values.geo) {
-      setError("Bitte einen Ort aus den Vorschlägen auswählen.")
-      return
-    }
-    if (!category) {
-      setError("Bitte eine Kategorie auswählen.")
-      return
-    }
-    if (!Number.isFinite(minPriceInCent) || !Number.isFinite(maxPriceInCent)) {
-      setError("Bitte gültige Preise eingeben.")
-      return
-    }
+    if (!place) return setError("Bitte einen Ort aus den Vorschlägen auswählen.")
+    if (!category) return setError("Bitte eine Kategorie auswählen.")
 
     try {
+      const minPriceInCent = parseEuroInCent(values.minEuro)
+      const maxPriceInCent = parseEuroInCent(values.maxEuro)
       await onSubmit({
         title: values.title.trim(),
         description: values.description.trim(),
@@ -135,7 +122,7 @@ export default function ServiceForm({
         minPriceInCent,
         maxPriceInCent,
         radiusKm,
-        place: { geo: values.geo, address: values.address.trim(), city: values.city.trim() },
+        place: { geo: new GeoPoint(place.lat, place.lon), address: place.label, city: place.area },
         categoryId: category.id,
         categoryName: category.nameDE,
         subcategoryId: subcategory?.slug,
@@ -185,53 +172,14 @@ export default function ServiceForm({
           />
         </div>
 
+        <CategoryFields
+          categories={categories}
+          categoryId={values.categoryId}
+          subcategoryId={values.subcategoryId}
+          onChange={(categoryId, subcategoryId) => setValues((previous) => ({ ...previous, categoryId, subcategoryId }))}
+        />
+
         <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="field-label" htmlFor="service-category">
-              Kategorie
-            </label>
-            <select
-              id="service-category"
-              required
-              value={values.categoryId}
-              onChange={(event) => {
-                setValues((previous) => ({
-                  ...previous,
-                  categoryId: event.target.value,
-                  subcategoryId: "",
-                }))
-              }}
-              className="field field-h field-select"
-            >
-              <option value="">Bitte auswählen</option>
-              {categories.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.nameDE}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="field-label" htmlFor="service-subcategory">
-              Unterkategorie
-            </label>
-            <select
-              id="service-subcategory"
-              value={values.subcategoryId}
-              onChange={(event) => set("subcategoryId", event.target.value)}
-              disabled={!category}
-              className="field field-h field-select"
-            >
-              <option value="">Optional</option>
-              {subcategories.map((entry) => (
-                <option key={entry.slug} value={entry.slug}>
-                  {entry.nameDE}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <div>
             <label className="field-label" htmlFor="service-pricing">
               Abrechnungsmodell
@@ -250,23 +198,8 @@ export default function ServiceForm({
             </select>
           </div>
 
-          <div>
-            <label className="field-label" htmlFor="service-status">
-              Status
-            </label>
-            <select
-              id="service-status"
-              value={values.status}
-              onChange={(event) => set("status", event.target.value as ServiceStatus)}
-              className="field field-h field-select"
-            >
-              <option value={ServiceStatus.active}>Aktiv</option>
-              <option value={ServiceStatus.paused}>Pausiert</option>
-            </select>
-          </div>
-
           {showUnitLabel && (
-            <div className="md:col-span-2">
+            <div>
               <label className="field-label" htmlFor="service-unit">
                 Einheit
               </label>
@@ -312,18 +245,13 @@ export default function ServiceForm({
         </div>
 
         <LocationField
-          value={values.address}
-          onChange={(value) => {
-            setValues((previous) => ({ ...previous, address: value, geo: null }))
-          }}
-          onSelect={(suggestion) => {
-            setValues((previous) => ({
-              ...previous,
-              address: suggestion.label,
-              city: cityFromLabel(suggestion.label),
-              geo: new GeoPoint(suggestion.lat, suggestion.lon),
-            }))
-          }}
+          label="Standort"
+          value={values.placeText}
+          selected={values.place}
+          onChange={(placeText) => setValues((previous) => ({ ...previous, placeText, place: null }))}
+          onSelect={(place) => setValues((previous) => ({ ...previous, placeText: place.label, place }))}
+          hint="Gespeichert wird nur der Stadtteil. Er dient dazu, Kunden in deinem Einsatzradius zu finden."
+          required
         />
 
         <div className="grid gap-5 md:grid-cols-2">

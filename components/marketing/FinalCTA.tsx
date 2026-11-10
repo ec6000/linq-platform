@@ -35,8 +35,7 @@ export default function FinalCTA() {
               </h2>
 
               <p className="mt-7 max-w-lg text-[16px] leading-relaxed text-white/65 md:text-[17px]">
-                Registrierung kostenlos, kein Abo, keine Vermittlungsgebühr für den Start.
-                Egal ob du Hilfe suchst oder anbietest.
+                Kostenlos und ohne Abo. Egal ob du Hilfe suchst oder anbietest.
               </p>
 
               <div className="mt-10 flex flex-col gap-3 sm:flex-row">

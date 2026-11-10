@@ -13,7 +13,6 @@ const EMPTY_PROFILE: Profile = {
   email: "",
   phone: "",
   company: "",
-  notificationsEnabled: true,
 }
 
 type ProfileDoc = Profile & { id: string }
@@ -26,8 +25,6 @@ function toProfile(data: Partial<ProfileDoc> | null): Profile {
     email: typeof data.email === "string" ? data.email : "",
     phone: typeof data.phone === "string" ? data.phone : "",
     company: typeof data.company === "string" ? data.company : "",
-    notificationsEnabled:
-      typeof data.notificationsEnabled === "boolean" ? data.notificationsEnabled : true,
   }
 }
 
@@ -53,7 +50,6 @@ export function useUserProfile(uid?: string) {
           email: profile.email.trim(),
           phone: profile.phone.trim(),
           company: profile.company.trim(),
-          notificationsEnabled: profile.notificationsEnabled,
           updatedAt: serverTimestamp(),
         })
       } catch (err) {

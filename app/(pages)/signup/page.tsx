@@ -4,20 +4,20 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Check, Chrome } from "lucide-react"
 import AuthCard from "@/components/auth/AuthCard"
-import { useAuth } from "@/components/auth/AuthProvider"
-import { UserRole } from "@/lib/types/user"
+import { authErrorMessage, useAuth } from "@/components/auth/AuthProvider"
+import type { UserRole } from "@/lib/types/user"
 import { getHomeForRole } from "@/lib/utils/auth"
 
 const roleOptions = [
   {
     value: "customer" as const,
     title: "Kunde",
-    description: "Aufträge erstellen und passende Dienstleister finden.",
+    description: "Ich brauche Hilfe beim Umzug.",
   },
   {
     value: "provider" as const,
     title: "Dienstleister",
-    description: "Services anbieten und neue Aufträge annehmen.",
+    description: "Ich biete Umzugshilfe an.",
   },
 ]
 
@@ -47,7 +47,7 @@ export default function SignUpPage() {
       router.replace(getHomeForRole(appUser.role))
     } catch (err) {
       console.error(err)
-      setError("Sign up fehlgeschlagen. Bitte versuche es erneut.")
+      setError(authErrorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -62,7 +62,7 @@ export default function SignUpPage() {
       router.replace(getHomeForRole(appUser.role))
     } catch (err) {
       console.error(err)
-      setError("Google Sign up fehlgeschlagen.")
+      setError(authErrorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -71,7 +71,7 @@ export default function SignUpPage() {
   return (
     <AuthCard
       title="Konto erstellen"
-      subtitle="Starte als Kunde oder Dienstleister – in unter einer Minute."
+      subtitle="Kostenlos, in unter einer Minute."
       footerText="Schon registriert?"
       footerLinkText="Anmelden"
       footerHref="/login"

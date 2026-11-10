@@ -2,6 +2,7 @@ import { GeoPoint, Timestamp } from "firebase-admin/firestore"
 import { CATEGORY_NAME, TAXONOMY, slugify, subcategoryOf } from "./taxonomy"
 import { CUSTOMERS, PROVIDERS, personName, requirePerson } from "./people"
 import { addressIn, requireDistrict } from "./places"
+import { roundCoordinate } from "../../lib/utils/geo"
 
 /**
  * Builds the whole demo graph in memory before anything is written.
@@ -24,6 +25,15 @@ const ago = (days: number) => Timestamp.fromMillis(NOW - days * DAY)
 
 const image = (id: string) => `https://images.unsplash.com/${id}?w=1200&q=80`
 
+/** What public documents carry: the district and coordinates rounded to ~1 km (see lib/utils/place.ts). */
+const publicPlace = (lat: number, lon: number, city: string) => ({
+  geo: new GeoPoint(roundCoordinate(lat), roundCoordinate(lon)),
+  address: city,
+  city,
+})
+const contactOf = (person: { email: string; phone: string }) => ({ email: person.email, phone: person.phone })
+const shortName = (person: { firstName: string; lastName: string }) => `${person.firstName} ${person.lastName.charAt(0)}.`
+
 type Pricing = { type: "fixed" | "hourly" | "unit"; unitLabel?: string }
 
 export interface SeedDocument {
@@ -37,12 +47,19 @@ export interface SeedOffer {
   data: Record<string, unknown>
 }
 
+/** `orders/{orderId}/private/address` — the exact address only the customer reads. */
+export interface SeedOrderAddress {
+  orderId: string
+  data: Record<string, unknown>
+}
+
 export interface Dataset {
   categories: SeedDocument[]
   users: SeedDocument[]
   services: SeedDocument[]
   orders: SeedDocument[]
   offers: SeedOffer[]
+  orderAddresses: SeedOrderAddress[]
   bookings: SeedDocument[]
   jobs: SeedDocument[]
 }
@@ -78,7 +95,6 @@ function buildUsers(): SeedDocument[] {
       email: person.email,
       phone: person.phone,
       company: person.company,
-      notificationsEnabled: true,
       createdAt: ago(90 - index),
       updatedAt: ago(90 - index),
     },
@@ -372,7 +388,7 @@ function buildServices(): SeedDocument[] {
   return SERVICE_SPECS.map((spec) => {
     const provider = requirePerson(spec.provider)
     const district = requireDistrict(spec.district)
-    const { address, city } = addressIn(spec.district, spec.addressIndex)
+    const { city } = addressIn(spec.district, spec.addressIndex)
     const subcategory = subcategoryOf(spec.categoryId, spec.subcategory)
     const created = ago(spec.createdDaysAgo)
 
@@ -388,7 +404,7 @@ function buildServices(): SeedDocument[] {
         pricing: spec.pricing,
         minPriceInCent: spec.minPriceInCent,
         maxPriceInCent: spec.maxPriceInCent,
-        place: { geo: new GeoPoint(district.lat, district.lon), address, city },
+        place: publicPlace(district.lat, district.lon, city),
         radiusKm: spec.radiusKm,
         categoryId: spec.categoryId,
         categoryName: CATEGORY_NAME.get(spec.categoryId),
@@ -423,8 +439,6 @@ interface OrderSpec {
   categoryId: string
   subcategory: string
   budgetInCent: number
-  radiusKm: number
-  priority: "low" | "normal" | "high" | "urgent"
   startInDays: number
   durationHours: number
   isFlexible: boolean
@@ -447,8 +461,6 @@ const ORDER_SPECS: OrderSpec[] = [
     categoryId: "moving",
     subcategory: "Umzugshilfe",
     budgetInCent: 18000,
-    radiusKm: 15,
-    priority: "high",
     startInDays: 6,
     durationHours: 4,
     isFlexible: false,
@@ -471,8 +483,6 @@ const ORDER_SPECS: OrderSpec[] = [
     categoryId: "cleaning",
     subcategory: "Fensterreinigung",
     budgetInCent: 12000,
-    radiusKm: 20,
-    priority: "normal",
     startInDays: 9,
     durationHours: 3,
     isFlexible: true,
@@ -493,8 +503,6 @@ const ORDER_SPECS: OrderSpec[] = [
     categoryId: "gardening",
     subcategory: "Hecke schneiden",
     budgetInCent: 26000,
-    radiusKm: 25,
-    priority: "normal",
     startInDays: 12,
     durationHours: 5,
     isFlexible: true,
@@ -515,8 +523,6 @@ const ORDER_SPECS: OrderSpec[] = [
     categoryId: "moving",
     subcategory: "Küchen- oder Möbelabbau",
     budgetInCent: 34000,
-    radiusKm: 20,
-    priority: "normal",
     startInDays: 4,
     durationHours: 6,
     isFlexible: false,
@@ -537,8 +543,6 @@ const ORDER_SPECS: OrderSpec[] = [
     categoryId: "handyman",
     subcategory: "Malerarbeiten",
     budgetInCent: 28000,
-    radiusKm: 15,
-    priority: "low",
     startInDays: 18,
     durationHours: 6,
     isFlexible: true,
@@ -559,8 +563,6 @@ const ORDER_SPECS: OrderSpec[] = [
     categoryId: "handyman",
     subcategory: "Möbelaufbau",
     budgetInCent: 15000,
-    radiusKm: 15,
-    priority: "urgent",
     startInDays: 2,
     durationHours: 4,
     isFlexible: false,
@@ -580,8 +582,6 @@ const ORDER_SPECS: OrderSpec[] = [
     categoryId: "gardening",
     subcategory: "Hochdruckreinigung",
     budgetInCent: 20000,
-    radiusKm: 30,
-    priority: "normal",
     startInDays: 15,
     durationHours: 4,
     isFlexible: true,
@@ -598,8 +598,6 @@ const ORDER_SPECS: OrderSpec[] = [
     categoryId: "household",
     subcategory: "Hilfe bei Erledigungen",
     budgetInCent: 6000,
-    radiusKm: 10,
-    priority: "high",
     startInDays: 3,
     durationHours: 2,
     isFlexible: true,
@@ -620,8 +618,6 @@ const ORDER_SPECS: OrderSpec[] = [
     categoryId: "moving",
     subcategory: "Keller ausräumen",
     budgetInCent: 22000,
-    radiusKm: 20,
-    priority: "normal",
     startInDays: -9,
     durationHours: 4,
     isFlexible: false,
@@ -642,8 +638,6 @@ const ORDER_SPECS: OrderSpec[] = [
     categoryId: "other",
     subcategory: "Nachhilfe",
     budgetInCent: 4500,
-    radiusKm: 8,
-    priority: "normal",
     startInDays: -20,
     durationHours: 2,
     isFlexible: true,
@@ -664,12 +658,14 @@ const ORDER_SPECS: OrderSpec[] = [
 interface OrderBuildResult {
   orders: SeedDocument[]
   offers: SeedOffer[]
+  orderAddresses: SeedOrderAddress[]
   jobs: SeedDocument[]
 }
 
 function buildOrders(): OrderBuildResult {
   const orders: SeedDocument[] = []
   const offers: SeedOffer[] = []
+  const orderAddresses: SeedOrderAddress[] = []
   const jobs: SeedDocument[] = []
 
   for (const spec of ORDER_SPECS) {
@@ -692,15 +688,13 @@ function buildOrders(): OrderBuildResult {
       id: spec.key,
       data: {
         customerId: customer.id,
-        customerName: personName(customer),
+        customerName: shortName(customer),
         title: spec.title,
         description: spec.description,
         status,
-        priority: spec.priority,
         timeWindow: { start, end, isFlexible: spec.isFlexible },
         budgetInCent: spec.budgetInCent,
-        place: { geo: new GeoPoint(district.lat, district.lon), address, city },
-        radiusKm: spec.radiusKm,
+        place: publicPlace(district.lat, district.lon, city),
         categoryId: spec.categoryId,
         categoryName: CATEGORY_NAME.get(spec.categoryId),
         subcategoryId: subcategory.id,
@@ -712,6 +706,7 @@ function buildOrders(): OrderBuildResult {
           ? {
               assignedProviderId: acceptedProvider.id,
               assignedProviderName: personName(acceptedProvider),
+              jobId: `job-${spec.key}`,
               assignedAt: ago(accepted!.daysAgo),
             }
           : {}),
@@ -722,9 +717,15 @@ function buildOrders(): OrderBuildResult {
       },
     })
 
+    orderAddresses.push({
+      orderId: spec.key,
+      data: { address, geo: new GeoPoint(district.lat, district.lon) },
+    })
+
     for (const offer of specOffers) {
       const provider = requirePerson(offer.provider)
-      const offerStatus = offer.accepted ? "accepted" : offer.declined ? "declined" : "pending"
+      // Accepting one offer declines the rest, as decideOffer does.
+      const offerStatus = offer.accepted ? "accepted" : offer.declined || status !== "open" ? "declined" : "pending"
       offers.push({
         orderId: spec.key,
         providerId: provider.id,
@@ -733,11 +734,11 @@ function buildOrders(): OrderBuildResult {
           orderTitle: spec.title,
           providerId: provider.id,
           providerName: personName(provider),
+          providerContact: contactOf(provider),
           priceInCent: offer.priceInCent,
           message: offer.message,
           status: offerStatus,
           ...(offerStatus === "pending" ? {} : { decidedAt: ago(offer.daysAgo) }),
-          ...(offer.declined ? { customerComment: "Danke, ein anderes Angebot passte zeitlich besser." } : {}),
           createdAt: ago(offer.daysAgo),
           updatedAt: ago(offer.daysAgo),
         },
@@ -755,8 +756,10 @@ function buildOrders(): OrderBuildResult {
           sourceId: spec.key,
           customerId: customer.id,
           customerName: personName(customer),
+          customerContact: contactOf(customer),
           providerId: acceptedProvider.id,
           providerName: personName(acceptedProvider),
+          providerContact: contactOf(acceptedProvider),
           title: spec.title,
           description: spec.description,
           categoryId: spec.categoryId,
@@ -776,7 +779,7 @@ function buildOrders(): OrderBuildResult {
     }
   }
 
-  return { orders, offers, jobs }
+  return { orders, offers, orderAddresses, jobs }
 }
 
 // ── Bookings and the jobs they produce ───────────────────────────────────────
@@ -921,12 +924,14 @@ function buildBookings(services: SeedDocument[]): { bookings: SeedDocument[]; jo
         serviceTitle: service.title,
         customerId: customer.id,
         customerName: personName(customer),
+        customerContact: contactOf(customer),
         providerId: service.providerId,
         providerName: service.providerName,
         categoryId: service.categoryId,
         categoryName: service.categoryName,
         pricing: service.pricing,
-        ...(spec.priceInCent !== undefined ? { priceInCent: spec.priceInCent } : {}),
+        // Accepting names the final price, so an accepted booking always has one.
+        ...(jobId || spec.priceInCent !== undefined ? { priceInCent: spec.priceInCent ?? service.minPriceInCent } : {}),
         message: spec.message,
         requestedDateText: spec.requestedDateText,
         place,
@@ -952,8 +957,10 @@ function buildBookings(services: SeedDocument[]): { bookings: SeedDocument[]; jo
         sourceId: spec.key,
         customerId: customer.id,
         customerName: personName(customer),
+        customerContact: contactOf(customer),
         providerId: service.providerId,
         providerName: service.providerName,
+        providerContact: contactOf(requirePerson(service.providerId as string)),
         title: service.title,
         description: spec.message,
         categoryId: service.categoryId,
@@ -989,6 +996,7 @@ export function buildDataset(): Dataset {
     services,
     orders: fromOrders.orders,
     offers: fromOrders.offers,
+    orderAddresses: fromOrders.orderAddresses,
     bookings: fromBookings.bookings,
     jobs: [...fromOrders.jobs, ...fromBookings.jobs],
   }
@@ -1097,10 +1105,26 @@ export function assertDatasetIsCoherent(dataset: Dataset) {
     expect(serviceIds.size > 0, "Keine Services im Datensatz.")
   }
 
+  const jobById = new Map(dataset.jobs.map((job) => [job.id, job.data]))
   for (const booking of dataset.bookings) {
     const jobId = booking.data.jobId as string | undefined
-    if (jobId) expect(jobIds.has(jobId), `Buchung ${booking.id}: verweist auf fehlenden Job ${jobId}.`)
+    if (!jobId) continue
+    expect(jobIds.has(jobId), `Buchung ${booking.id}: verweist auf fehlenden Job ${jobId}.`)
+    expect(
+      jobById.get(jobId)?.priceInCent === booking.data.priceInCent,
+      `Buchung ${booking.id}: vereinbarter Preis weicht vom Job ab.`,
+    )
   }
+
+  // The rules only let a job exist if its order points back at it.
+  for (const order of dataset.orders) {
+    const jobId = order.data.jobId as string | undefined
+    expect(!jobId || jobById.get(jobId)?.sourceId === order.id, `Auftrag ${order.id}: jobId zeigt nicht auf seinen Job.`)
+    expect(Boolean(order.data.assignedProviderId) === Boolean(jobId), `Auftrag ${order.id}: Vergabe ohne Job.`)
+  }
+
+  const addressed = new Set(dataset.orderAddresses.map((entry) => entry.orderId))
+  for (const order of dataset.orders) expect(addressed.has(order.id), `Auftrag ${order.id}: keine private Adresse.`)
 
   if (problems.length > 0) {
     throw new Error(`Der Seed-Datensatz ist nicht konsistent:\n  - ${problems.join("\n  - ")}`)

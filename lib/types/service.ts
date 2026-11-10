@@ -39,9 +39,3 @@ export enum ServiceStatus {
   /** Soft-deleted. Never shown, never bookable. */
   archived = "archived",
 }
-
-export const SERVICE_STATUS_LABEL: Record<ServiceStatus, string> = {
-  [ServiceStatus.active]: "Aktiv",
-  [ServiceStatus.paused]: "Pausiert",
-  [ServiceStatus.archived]: "Archiviert",
-}

@@ -1,18 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
-import { ImageIcon, MapPin, Pencil } from "lucide-react"
-import { SERVICE_STATUS_LABEL, ServiceStatus, type Service } from "@/lib/types/service"
+import ServiceImage from "@/components/ServiceImage"
+import { MapPin, Pencil } from "lucide-react"
+import { ServiceStatus, type Service } from "@/lib/types/service"
+import StatusPill from "@/components/StatusPill"
 import { setServiceStatus } from "@/lib/data/services"
 import { formatPriceRange } from "@/lib/utils/format"
 import ConfirmationModal from "@/components/ConfirmationModal"
-
-const statusStyles: Record<ServiceStatus, string> = {
-  [ServiceStatus.active]: "pill-success",
-  [ServiceStatus.paused]: "pill-muted",
-  [ServiceStatus.archived]: "pill-muted",
-}
 
 interface ServiceCardProps {
   service: Service
@@ -20,13 +15,12 @@ interface ServiceCardProps {
 }
 
 export default function ServiceCard({ service, onEdit }: ServiceCardProps) {
-  const [status, setStatus] = useState<ServiceStatus>(service.status)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
   const [toggleConfirmOpen, setToggleConfirmOpen] = useState(false)
 
-  const isActive = status === ServiceStatus.active
+  const isActive = service.status === ServiceStatus.active
 
   async function apply(next: ServiceStatus, close: () => void) {
     if (loading) return
@@ -34,7 +28,6 @@ export default function ServiceCard({ service, onEdit }: ServiceCardProps) {
     setError(null)
     try {
       await setServiceStatus(service.id, next)
-      setStatus(next)
       close()
     } catch (err) {
       console.error(err)
@@ -46,24 +39,10 @@ export default function ServiceCard({ service, onEdit }: ServiceCardProps) {
 
   return (
     <>
-      <div className="card card-interactive p-5 sm:p-6">
+      <div className="card p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-start gap-4">
-            <div className="relative h-16 w-16 flex-none overflow-hidden rounded-md bg-muted">
-              {service.imageUrl ? (
-                <Image
-                  src={service.imageUrl}
-                  alt={service.title}
-                  fill
-                  sizes="64px"
-                  className="object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-text/25">
-                  <ImageIcon size={20} strokeWidth={1.6} aria-hidden />
-                </div>
-              )}
-            </div>
+            <ServiceImage src={service.imageUrl} sizes="64px" iconSize={20} className="h-16 w-16 flex-none rounded-md" />
 
             <div className="flex min-w-0 flex-col gap-1.5">
               <h2 className="text-[15.5px] font-semibold leading-snug text-text">{service.title}</h2>
@@ -78,7 +57,7 @@ export default function ServiceCard({ service, onEdit }: ServiceCardProps) {
           </div>
 
           <div className="flex flex-none items-center justify-between gap-3 sm:flex-col sm:items-end sm:gap-2">
-            <span className={`pill ${statusStyles[status]}`}>{SERVICE_STATUS_LABEL[status]}</span>
+            <StatusPill status={service.status} />
 
             <div className="flex flex-col items-start gap-1 sm:items-end">
               <p className="num text-[16px] font-semibold text-text">

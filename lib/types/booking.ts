@@ -1,5 +1,5 @@
 import type { Timestamp } from "firebase/firestore"
-import type { DocumentMeta, Place, Pricing } from "./common"
+import type { Contact, DocumentMeta, Place, Pricing } from "./common"
 
 /**
  * A customer's request against a published service.
@@ -16,6 +16,7 @@ export interface Booking extends DocumentMeta {
 
   customerId: string
   customerName: string
+  customerContact?: Contact
   providerId: string
   providerName: string
 
@@ -23,7 +24,10 @@ export interface Booking extends DocumentMeta {
   categoryName: string
 
   pricing: Pricing
-  /** What the customer proposes to pay. Absent means "ask the provider". */
+  /**
+   * What the customer proposes to pay; absent means "ask the provider".
+   * On acceptance the provider confirms the final price, which replaces it.
+   */
   priceInCent?: number
 
   /** The customer's message and preferred date, as free text. */
@@ -49,11 +53,4 @@ export enum BookingStatus {
   accepted = "accepted",
   declined = "declined",
   cancelled = "cancelled",
-}
-
-export const BOOKING_STATUS_LABEL: Record<BookingStatus, string> = {
-  [BookingStatus.requested]: "Angefragt",
-  [BookingStatus.accepted]: "Angenommen",
-  [BookingStatus.declined]: "Abgelehnt",
-  [BookingStatus.cancelled]: "Storniert",
 }

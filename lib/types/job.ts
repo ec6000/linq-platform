@@ -1,5 +1,5 @@
 import type { Timestamp } from "firebase/firestore"
-import type { DocumentMeta, Place, Pricing } from "./common"
+import type { Contact, DocumentMeta, Place, Pricing } from "./common"
 
 /**
  * Agreed work. Both flows converge here.
@@ -23,6 +23,10 @@ export interface Job extends DocumentMeta {
   providerId: string
   providerName: string
 
+  /** Snapshotted when the job was agreed, so each side can reach the other. */
+  customerContact?: Contact
+  providerContact?: Contact
+
   title: string
   description: string
   categoryId: string
@@ -35,6 +39,8 @@ export interface Job extends DocumentMeta {
 
   place: Place
   scheduledAt: Timestamp
+  /** A booking names its date in the customer's own words; shown instead of `scheduledAt`. */
+  dateText?: string
 
   status: JobStatus
 
@@ -60,16 +66,4 @@ export enum JobStatus {
   inProgress = "inProgress",
   completed = "completed",
   cancelled = "cancelled",
-}
-
-export const JOB_STATUS_LABEL: Record<JobStatus, string> = {
-  [JobStatus.scheduled]: "Geplant",
-  [JobStatus.inProgress]: "In Arbeit",
-  [JobStatus.completed]: "Abgeschlossen",
-  [JobStatus.cancelled]: "Storniert",
-}
-
-export const JOB_SOURCE_LABEL: Record<JobSourceType, string> = {
-  [JobSourceType.order]: "Auftrag",
-  [JobSourceType.booking]: "Service",
 }

@@ -920,8 +920,9 @@
   transform: none;
 }
 
+/* No fill mode: a transform that stays applied would trap the fixed overlays inside the page. */
 .page-enter {
-  animation: rise-in 420ms var(--ease-out) both;
+  animation: rise-in 420ms var(--ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {

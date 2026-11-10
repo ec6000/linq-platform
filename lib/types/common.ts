@@ -31,10 +31,14 @@ export interface Pricing {
   unitLabel?: string
 }
 
-/** Denormalised name of a referenced user, so lists render without extra reads. */
-export interface PartyRef {
-  id: string
-  name: string
+/**
+ * How to reach someone. Each party snapshots their own contact at the moment
+ * they commit (bidding, requesting, accepting), so profiles can stay private
+ * and both sides still know how to reach each other once a job exists.
+ */
+export interface Contact {
+  email: string
+  phone: string
 }
 
 /** Fields every document carries. */

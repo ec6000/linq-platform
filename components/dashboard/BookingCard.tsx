@@ -1,75 +1,94 @@
 "use client"
 
 import { useState } from "react"
-import { MapPin } from "lucide-react"
-import { BOOKING_STATUS_LABEL, BookingStatus, type Booking } from "@/lib/types/booking"
+import { CalendarClock, Euro, MapPin } from "lucide-react"
+import { BookingStatus, type Booking } from "@/lib/types/booking"
+import type { UserRole } from "@/lib/types/user"
 import { useRespondToBooking } from "@/lib/hooks/useBookings"
+import { cancelBooking } from "@/lib/data/bookings"
 import { formatPrice } from "@/lib/utils/format"
+import { centsToInput, parseEuroInCent } from "@/lib/utils/validation"
 import ConfirmationModal from "@/components/ConfirmationModal"
+import StatusPill from "@/components/StatusPill"
 
-const statusStyles: Record<BookingStatus, string> = {
-  [BookingStatus.requested]: "pill-accent",
-  [BookingStatus.accepted]: "pill-success",
-  [BookingStatus.declined]: "pill-muted",
-  [BookingStatus.cancelled]: "pill-muted",
-}
+type Action = "accept" | "decline" | "cancel"
 
-export default function BookingCard({ booking }: { booking: Booking }) {
-  const [status, setStatus] = useState(booking.status)
-  const [declineMessage, setDeclineMessage] = useState(booking.declineMessage ?? "")
-  const [confirmDeclineOpen, setConfirmDeclineOpen] = useState(false)
-  const [confirmAcceptOpen, setConfirmAcceptOpen] = useState(false)
+/**
+ * A request for a service. The provider answers it — accepting means naming
+ * the price, because a job without an agreed price cannot exist. The customer
+ * can withdraw it until then.
+ */
+export default function BookingCard({ booking, role }: { booking: Booking; role: UserRole }) {
   const { respond, loading, error } = useRespondToBooking()
+  const [action, setAction] = useState<Action | null>(null)
+  const [price, setPrice] = useState(centsToInput(booking.priceInCent))
+  const [note, setNote] = useState("")
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
-  const canRespond = status === BookingStatus.requested
-
-  async function handleAccept() {
-    if (await respond(booking.id, BookingStatus.accepted)) {
-      setStatus(BookingStatus.accepted)
-      setConfirmAcceptOpen(false)
-    }
+  const open = booking.status === BookingStatus.requested
+  let priceInCent: number | null = null
+  try {
+    priceInCent = parseEuroInCent(price)
+  } catch {
+    // Keeps "Annehmen" disabled until the price parses.
   }
 
-  async function handleDecline() {
-    if (await respond(booking.id, BookingStatus.declined, declineMessage)) {
-      setStatus(BookingStatus.declined)
-      setConfirmDeclineOpen(false)
+  async function confirm() {
+    if (action === "cancel") {
+      setCancelError(null)
+      try {
+        await cancelBooking(booking.id)
+        setAction(null)
+      } catch (err) {
+        setCancelError(err instanceof Error ? err.message : "Anfrage konnte nicht zurückgezogen werden.")
+      }
+      return
     }
+    const ok =
+      action === "accept"
+        ? await respond(booking.id, BookingStatus.accepted, { priceInCent: priceInCent ?? undefined })
+        : await respond(booking.id, BookingStatus.declined, { message: note })
+    if (ok) setAction(null)
+  }
+
+  const dialog = {
+    accept: {
+      title: "Anfrage annehmen?",
+      text: "Nenne den vereinbarten Preis. Daraus wird ein Job, und ihr seht gegenseitig eure Kontaktdaten.",
+      label: "Annehmen",
+    },
+    decline: { title: "Anfrage ablehnen?", text: "Ein kurzer Grund hilft dem Kunden weiter.", label: "Ablehnen" },
+    cancel: { title: "Anfrage zurückziehen?", text: "Der Anbieter sieht danach, dass du sie zurückgezogen hast.", label: "Zurückziehen" },
   }
 
   return (
     <>
-      <article className="card card-interactive p-6">
-        <div className="mb-3.5 flex items-center justify-between gap-3">
-          <span className="text-[11.5px] font-semibold uppercase tracking-[0.12em] text-text/40">
-            Anfrage von {booking.customerName}
-          </span>
-          <span className={`pill ${statusStyles[status]}`}>{BOOKING_STATUS_LABEL[status]}</span>
+      <article className="card p-6">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-[12.5px] text-text/50">
+            {role === "provider" ? `Anfrage von ${booking.customerName}` : `An ${booking.providerName}`}
+          </p>
+          <StatusPill status={booking.status} />
         </div>
 
         <h2 className="text-[17px] font-semibold leading-snug text-text">{booking.serviceTitle}</h2>
 
         {booking.message && (
-          <blockquote className="mt-3.5 line-clamp-3 border-l-2 border-secondary pl-3.5 text-[13.5px] leading-relaxed text-text/60">
+          <blockquote className="mt-3 line-clamp-3 border-l-2 border-secondary pl-3.5 text-[13.5px] leading-relaxed text-text/60">
             {booking.message}
           </blockquote>
         )}
 
-        <div className="mt-5">
-          <p className="text-[11.5px] font-semibold uppercase tracking-[0.12em] text-text/40">
-            Preisvorschlag
-          </p>
-          <p className="num mt-1 text-[22px] font-semibold text-text">
-            {booking.priceInCent === undefined
-              ? "Preis auf Anfrage"
-              : formatPrice(booking.priceInCent, booking.pricing)}
-          </p>
-        </div>
-
         <div className="mt-4 flex flex-col gap-2 text-[13px] text-text/60">
+          <p className="flex items-center gap-2">
+            <Euro size={14} strokeWidth={1.8} className="flex-none text-text/35" aria-hidden />
+            <span className="num">
+              {booking.priceInCent === undefined ? "Preis auf Anfrage" : formatPrice(booking.priceInCent, booking.pricing)}
+            </span>
+          </p>
           {booking.requestedDateText && (
             <p className="flex items-center gap-2">
-              <span className="text-text/35">Wunschtermin</span>
+              <CalendarClock size={14} strokeWidth={1.8} className="flex-none text-text/35" aria-hidden />
               {booking.requestedDateText}
             </p>
           )}
@@ -79,91 +98,72 @@ export default function BookingCard({ booking }: { booking: Booking }) {
           </p>
         </div>
 
-        {booking.declineMessage && status === BookingStatus.declined && (
-          <p className="card-sunken mt-4 px-3.5 py-2.5 text-[13px] text-text/65">
-            Kommentar zur Ablehnung: {booking.declineMessage}
-          </p>
+        {booking.declineMessage && (
+          <p className="card-sunken mt-4 px-3.5 py-2.5 text-[13px] text-text/65">{booking.declineMessage}</p>
         )}
 
-        {error && (
+        {(error || cancelError) && (
           <p role="alert" className="notice notice-error mt-4">
-            {error}
+            {error ?? cancelError}
           </p>
         )}
 
-        {canRespond && (
-          <div className="mt-6 flex items-center justify-end gap-2 border-t border-secondary pt-5">
-            <button
-              type="button"
-              onClick={() => setConfirmDeclineOpen(true)}
-              disabled={loading}
-              className="btn btn-ghost btn-sm"
-            >
-              Ablehnen
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmAcceptOpen(true)}
-              disabled={loading}
-              className="btn btn-primary btn-sm"
-            >
-              Annehmen
-            </button>
+        {open && (
+          <div className="mt-5 flex items-center justify-end gap-2">
+            {role === "provider" ? (
+              <>
+                <button type="button" onClick={() => setAction("decline")} className="btn btn-ghost btn-sm">
+                  Ablehnen
+                </button>
+                <button type="button" onClick={() => setAction("accept")} className="btn btn-primary btn-sm">
+                  Annehmen
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={() => setAction("cancel")} className="btn btn-danger btn-sm">
+                Zurückziehen
+              </button>
+            )}
           </div>
         )}
       </article>
 
       <ConfirmationModal
-        open={confirmAcceptOpen}
-        title="Anfrage annehmen?"
-        description="Aus der Anfrage wird ein Job, den du anschließend in deinem Dashboard verwaltest."
-        confirmLabel="Ja, annehmen"
+        open={action !== null}
+        title={action ? dialog[action].title : ""}
+        description={action ? dialog[action].text : ""}
+        confirmLabel={action ? dialog[action].label : ""}
+        destructive={action !== "accept"}
         loading={loading}
-        onCancel={() => setConfirmAcceptOpen(false)}
-        onConfirm={handleAccept}
-      />
-
-      {confirmDeclineOpen && (
-        <div className="overlay items-center justify-center">
-          <div className="sheet w-full max-w-lg p-6">
-            <h3 className="text-[17px] font-semibold text-text">Anfrage ablehnen?</h3>
-            <p className="mt-2 text-[14px] leading-relaxed text-text/60">
-              Du kannst optional einen Kommentar für die Ablehnung hinterlegen.
-            </p>
-
-            <label className="field-label mt-6" htmlFor={`decline-${booking.id}`}>
-              Kommentar
-            </label>
-            <textarea
-              id={`decline-${booking.id}`}
-              value={declineMessage}
-              onChange={(event) => setDeclineMessage(event.target.value)}
-              rows={4}
-              placeholder="z. B. Termin passt leider nicht in meinen Kalender"
-              className="field resize-none"
+        confirmDisabled={action === "accept" && !priceInCent}
+        onCancel={() => setAction(null)}
+        onConfirm={confirm}
+      >
+        {action === "accept" && (
+          <div className="field-group field-h">
+            <Euro size={15} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
+            <input
+              aria-label="Vereinbarter Preis in Euro"
+              inputMode="decimal"
+              autoFocus
+              value={price}
+              onChange={(event) => setPrice(event.target.value)}
+              placeholder="0,00"
+              className="num"
             />
-
-            <div className="mt-6 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setConfirmDeclineOpen(false)}
-                disabled={loading}
-                className="btn btn-ghost"
-              >
-                Abbrechen
-              </button>
-              <button
-                type="button"
-                onClick={handleDecline}
-                disabled={loading}
-                className="btn btn-danger-solid"
-              >
-                {loading ? "Wird gespeichert…" : "Ablehnung bestätigen"}
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        )}
+        {action === "decline" && (
+          <textarea
+            aria-label="Grund"
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            rows={3}
+            placeholder="z. B. Der Termin passt leider nicht."
+            className="field resize-none"
+          />
+        )}
+      </ConfirmationModal>
     </>
   )
 }

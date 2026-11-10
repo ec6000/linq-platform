@@ -31,8 +31,8 @@ export default function LocalFocus() {
             />
 
             <p className="mt-7 max-w-xl text-[15px] leading-relaxed text-text/60">
-              Ob du in Deutz wohnst und Hilfe beim Umzug brauchst oder in Lindenthal deine
-              Terrasse machen lassen willst – wir verbinden dich mit Menschen aus deinem Veedel.
+              Ob von Deutz nach Ehrenfeld oder innerhalb von Sülz: Wir verbinden dich mit Helfern
+              aus deinem Veedel.
             </p>
           </Reveal>
 
@@ -55,7 +55,7 @@ export default function LocalFocus() {
               </ul>
 
               <p className="mt-7 text-[13px] leading-relaxed text-text/50">
-                Dein Veedel ist nicht dabei? Trag dich ein – wir erweitern Köln Stück für Stück.
+                Und überall dazwischen: Aufträge gibt es in ganz Köln.
               </p>
             </div>
           </Reveal>
