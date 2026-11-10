@@ -4,5 +4,4 @@ export interface Profile {
   email: string
   phone: string
   company: string
-  notificationsEnabled: boolean
 }

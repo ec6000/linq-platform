@@ -1,11 +1,6 @@
-// app/page.tsx
 import type { Metadata } from "next";
 import Hero from "@/components/marketing/Hero";
-import TrustStrip from "@/components/marketing/TrustStrip";
-import ValueProp from "@/components/marketing/ValueProp";
-import ForCustomers from "@/components/marketing/ForCustomers";
 import ForProviders from "@/components/marketing/ForProviders";
-import Categories from "@/components/marketing/Categories";
 import HowItWorks from "@/components/marketing/HowItWorks";
 import Trust from "@/components/marketing/Trust";
 import LocalFocus from "@/components/marketing/LocalFocus";
@@ -20,20 +15,10 @@ import {
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "LiNQ – Lokale Dienstleister in Köln finden | Hilfe, die passt.",
+  title: { absolute: "LiNQ – Umzugshilfe in Köln, direkt vom Helfer" },
   description:
-    "Reinigung, Umzug, Gartenarbeit, Möbelaufbau: Finde zuverlässige Dienstleister in Köln – oder veröffentliche deinen Auftrag in Minuten. Lokal, direkt, unkompliziert.",
-  keywords: [
-    "Dienstleister Köln",
-    "lokale Dienstleistungen",
-    "Umzugshilfe Köln",
-    "Reinigung Köln",
-    "Gartenarbeit Köln",
-    "Möbelaufbau Köln",
-    "Haushaltshilfe Köln",
-    "Aufträge finden Köln",
-    "Handwerker Köln",
-  ],
+    "Beschreib deinen Umzug in zwei Minuten. Helfer aus Köln schicken dir ihren Preis, du suchst dir einen aus. Kostenlos, deine Adresse bleibt privat.",
+  keywords: ["Umzugshilfe Köln", "Umzugshelfer Köln", "Möbel tragen Köln", "Kleintransport Köln", "Entrümpelung Köln"],
   authors: [{ name: "LiNQ" }],
   creator: "LiNQ",
   publisher: "LiNQ",
@@ -48,16 +33,13 @@ export const metadata: Metadata = {
     locale: "de_DE",
     url: SITE_URL,
     siteName: "LiNQ",
-    title: "LiNQ – Lokale Dienstleister in Köln finden",
-    description:
-      "Die einfachste Art, lokale Hilfe in Köln zu finden oder als Dienstleister neue Aufträge zu bekommen.",
-
+    title: "LiNQ – Umzugshilfe in Köln",
+    description: "Helfer aus Köln schicken dir ihren Preis. Du suchst dir einen aus.",
   },
   twitter: {
     card: "summary",
-    title: "LiNQ – Lokale Dienstleister in Köln finden",
-    description:
-      "Reinigung, Umzug, Gartenarbeit & mehr. Lokale Hilfe, die passt.",
+    title: "LiNQ – Umzugshilfe in Köln",
+    description: "Helfer aus Köln schicken dir ihren Preis. Du suchst dir einen aus.",
   },
   robots: {
     index: true,
@@ -70,7 +52,7 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
-  category: "Lokale Dienstleistungen",
+  category: "Umzugshilfe",
 };
 
 export default function LandingPage() {
@@ -88,12 +70,8 @@ export default function LandingPage() {
       />
 
       <Hero />
-      <TrustStrip />
-      <ValueProp />
-      <ForCustomers />
-      <ForProviders />
-      <Categories />
       <HowItWorks />
+      <ForProviders />
       <Trust />
       <LocalFocus />
       <FinalCTA />

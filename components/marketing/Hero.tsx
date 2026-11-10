@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Check, MapPin } from "lucide-react";
 import Reveal from "@/components/motion/Reveal";
 
-const assurances = ["Kostenlos registrieren", "Keine Abo-Falle", "Direkter Kontakt"];
+const assurances = ["Kostenlos", "Adresse bleibt privat", "Du entscheidest"];
 
 export default function Hero() {
   return (
@@ -28,7 +28,7 @@ export default function Hero() {
 
           <Reveal delay={60}>
             <h1 className="display mt-8 text-[46px] leading-[1.02] text-primary sm:text-[62px] md:text-[76px]">
-              Lokale Hilfe.
+              Umzugshilfe in Köln.
               <br />
               <span className="text-accent-ink">Ohne Umwege.</span>
             </h1>
@@ -36,8 +36,8 @@ export default function Hero() {
 
           <Reveal delay={120}>
             <p className="lede mx-auto mt-7 max-w-xl">
-              Beschreibe, was du brauchst. Geprüfte Dienstleister aus deinem Veedel melden
-              sich direkt bei dir.
+              Beschreib deinen Umzug in zwei Minuten. Helfer aus Köln schicken dir ihren Preis,
+              du suchst dir einen aus.
             </p>
           </Reveal>
 

@@ -4,52 +4,35 @@ import { doc, runTransaction, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase/firebase"
 import { requireAppUser } from "@/lib/firebase/currentUser"
 import { JobSourceType, JobStatus } from "@/lib/types/job"
-import { OrderStatus } from "@/lib/types/order"
 import { canChangeJobStatus } from "@/lib/utils/jobStatus"
 
-/** A job's status drives its order's status, so the two move together. */
-const ORDER_STATUS_FOR_JOB: Partial<Record<JobStatus, OrderStatus>> = {
-  [JobStatus.inProgress]: OrderStatus.inProgress,
-  [JobStatus.completed]: OrderStatus.completed,
-  [JobStatus.cancelled]: OrderStatus.cancelled,
+const STAMP: Partial<Record<JobStatus, string>> = {
+  [JobStatus.inProgress]: "startedAt",
+  [JobStatus.completed]: "completedAt",
+  [JobStatus.cancelled]: "cancelledAt",
 }
 
+/**
+ * The provider moves a job forward; either side may call it off before it is
+ * done. A job from an order carries its order along, because the two status
+ * names are the same and the customer reads the order, not the job.
+ */
 export async function changeJobStatus(jobId: string, status: JobStatus) {
-  const user = await requireAppUser("provider")
+  const user = await requireAppUser()
 
   await runTransaction(db, async (transaction) => {
     const ref = doc(db, "jobs", jobId)
     const job = (await transaction.get(ref)).data()
-    if (!job || job.providerId !== user.uid) throw new Error("Job nicht gefunden.")
-    if (!canChangeJobStatus(job.status, status)) {
+    const isProvider = job?.providerId === user.uid
+    if (!job || (!isProvider && job.customerId !== user.uid)) throw new Error("Job nicht gefunden.")
+    if (!canChangeJobStatus(job.status, status, isProvider ? "provider" : "customer")) {
       throw new Error("Der Jobstatus hat sich geändert. Bitte erneut prüfen.")
     }
 
-    // A job that came from an order must still belong to this provider.
-    const orderRef = job.sourceType === JobSourceType.order ? doc(db, "orders", job.sourceId) : null
-    if (orderRef) {
-      const order = (await transaction.get(orderRef)).data()
-      if (!order || order.assignedProviderId !== user.uid) {
-        throw new Error("Die Auftragszuordnung ist nicht mehr gültig.")
-      }
-    }
+    const stamp = STAMP[status]
+    const change = { status, updatedAt: serverTimestamp(), ...(stamp ? { [stamp]: serverTimestamp() } : {}) }
+    transaction.update(ref, change)
 
-    transaction.update(ref, {
-      status,
-      updatedAt: serverTimestamp(),
-      ...(status === JobStatus.inProgress ? { startedAt: serverTimestamp() } : {}),
-      ...(status === JobStatus.completed ? { completedAt: serverTimestamp() } : {}),
-      ...(status === JobStatus.cancelled ? { cancelledAt: serverTimestamp() } : {}),
-    })
-
-    const orderStatus = ORDER_STATUS_FOR_JOB[status]
-    if (orderRef && orderStatus) {
-      transaction.update(orderRef, {
-        status: orderStatus,
-        updatedAt: serverTimestamp(),
-        ...(status === JobStatus.completed ? { completedAt: serverTimestamp() } : {}),
-        ...(status === JobStatus.cancelled ? { cancelledAt: serverTimestamp() } : {}),
-      })
-    }
+    if (job.sourceType === JobSourceType.order) transaction.update(doc(db, "orders", job.sourceId), change)
   })
 }

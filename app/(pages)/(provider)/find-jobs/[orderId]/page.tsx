@@ -9,18 +9,11 @@ import OfferModal from "@/components/find-jobs/OfferModal"
 import ConfirmationModal from "@/components/ConfirmationModal"
 import { useOrder } from "@/lib/hooks/useOrders"
 import { useMyOffer, useOfferActions } from "@/lib/hooks/useOffers"
-import { ORDER_STATUS_LABEL, OrderStatus } from "@/lib/types/order"
-import { OFFER_STATUS_LABEL, OfferStatus } from "@/lib/types/offer"
+import { OrderStatus } from "@/lib/types/order"
+import { OfferStatus } from "@/lib/types/offer"
+import StatusPill, { statusLabel } from "@/components/StatusPill"
 import { formatEuro, formatTimeRange } from "@/lib/utils/format"
 import { parseDocumentId } from "@/lib/utils/validation"
-
-const statusStyles: Record<OrderStatus, string> = {
-  [OrderStatus.open]: "pill-accent",
-  [OrderStatus.assigned]: "pill-primary",
-  [OrderStatus.inProgress]: "pill-primary",
-  [OrderStatus.completed]: "pill-success",
-  [OrderStatus.cancelled]: "pill-muted",
-}
 
 function BackLink() {
   return (
@@ -83,16 +76,16 @@ export default function DetailedOrderPage() {
     },
     {
       icon: MapPin,
-      label: "Ort & Radius",
-      value: order.place.address,
-      hint: `Suchradius: ${order.radiusKm} km`,
+      label: "Gegend",
+      value: order.place.city,
+      hint: "Die genaue Adresse bekommst du mit der Zusage.",
     },
     { icon: UserRound, label: "Kunde", value: order.customerName },
     {
       icon: CircleDollarSign,
       label: "Dein Angebot",
       value: offer ? `${formatEuro(offer.priceInCent)} €` : "Noch kein Angebot gesendet.",
-      hint: offer ? OFFER_STATUS_LABEL[offer.status] : undefined,
+      hint: offer ? statusLabel(offer.status) : undefined,
     },
   ]
 
@@ -111,9 +104,7 @@ export default function DetailedOrderPage() {
           <div className="min-w-0">
             <h1 className="display text-[28px] text-primary md:text-[36px]">{order.title}</h1>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className={`pill ${statusStyles[order.status]}`}>
-                {ORDER_STATUS_LABEL[order.status]}
-              </span>
+              <StatusPill status={order.status} />
               <span className="pill pill-outline">
                 {order.categoryName}
                 {order.subcategoryName ? ` · ${order.subcategoryName}` : ""}
@@ -158,13 +149,13 @@ export default function DetailedOrderPage() {
           </p>
         </div>
 
-        {order.imageUrls.length > 0 && (
+        {order.imageUrls && order.imageUrls.length > 0 && (
           <div className="mt-9">
             <h2 className="text-[11.5px] font-semibold uppercase tracking-[0.12em] text-text/40">
               Bilder
             </h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {order.imageUrls.map((url) => (
+              {order.imageUrls?.map((url) => (
                 <div
                   key={url}
                   className="relative h-44 w-full overflow-hidden rounded-md border border-secondary bg-muted"

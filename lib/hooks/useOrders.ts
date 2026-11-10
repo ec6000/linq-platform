@@ -7,7 +7,8 @@ import { db } from "@/lib/firebase/firebase"
 import { decodeDocument } from "@/lib/firebase/documents"
 import { useFirestoreDocument, useFirestoreQuery } from "@/lib/hooks/useFirestoreQuery"
 import { isValidDocumentId } from "@/lib/utils/validation"
-import { OrderStatus, type Order } from "@/lib/types/order"
+import { OrderStatus, type Order, type PrivateAddress } from "@/lib/types/order"
+import { privateAddressRef } from "@/lib/data/orders"
 
 const decode = decodeDocument<Order>
 const MESSAGE = "Aufträge konnten nicht geladen werden."
@@ -53,4 +54,11 @@ export function useOrder(orderId?: string) {
   )
   const { data, ...state } = useFirestoreDocument<Order>(source, MESSAGE)
   return { order: data, ...state }
+}
+
+/** The exact address. Only the order's customer can read it. */
+export function useOrderAddress(orderId?: string) {
+  const source = useMemo(() => (isValidDocumentId(orderId) ? privateAddressRef(orderId) : null), [orderId])
+  const { data, ...state } = useFirestoreDocument<PrivateAddress & { id: string }>(source, MESSAGE)
+  return { address: data, ...state }
 }

@@ -5,26 +5,22 @@ import SectionHeading from "./SectionHeading";
 
 const providerBenefits = [
   {
-    title: "Aufträge direkt aus deiner Nachbarschaft",
-    text: "Sieh neue Aufträge in Köln in Echtzeit und reagiere, wenn es passt.",
+    title: "Umzüge aus deiner Nähe",
+    text: "Neue Aufträge erscheinen sofort, sortiert nach Entfernung zu deinem Standort.",
   },
   {
-    title: "Sichtbar werden ohne Werbebudget",
-    text: "Dein Profil erscheint dort, wo Menschen aktiv nach deiner Leistung suchen.",
+    title: "Dein Preis, dein Kalender",
+    text: "Du nennst den Preis und nimmst nur, was zu dir passt. Kein Bieterzwang.",
   },
   {
-    title: "Struktur statt Bauchgefühl",
-    text: "Termine, Nachrichten und Rechnungen zentral – von der Anfrage bis zur Abrechnung.",
-  },
-  {
-    title: "Frei entscheiden, was du annimmst",
-    text: "Kein Zwang, kein Bieterdruck. Du wählst aus, was zu dir und deinem Kalender passt.",
+    title: "Auch direkt angefragt werden",
+    text: "Leg deine Leistungen als Service an. Kunden in deinem Einsatzradius finden dich.",
   },
 ];
 
 export default function ForProviders() {
   return (
-    <section id="fuer-dienstleister" aria-labelledby="providers-heading" className="section">
+    <section id="fuer-dienstleister" aria-labelledby="providers-heading" className="band section">
       <div className="shell">
         <div className="grid grid-cols-1 items-center gap-14 lg:grid-cols-12 lg:gap-20">
           <Reveal className="order-2 lg:order-1 lg:col-span-5">
@@ -36,8 +32,8 @@ export default function ForProviders() {
               <SectionHeading
                 id="providers-heading"
                 eyebrow="Für Dienstleister"
-                title="Mehr Aufträge. Weniger Akquise."
-                description="Ob solo-selbstständig oder kleines Team – LiNQ bringt dich mit Kunden in Köln zusammen, die deine Leistung wirklich brauchen."
+                title="Mehr Umzüge. Weniger Akquise."
+                description="Ob allein mit Sackkarre oder als Team mit Transporter: LiNQ zeigt dir, wer in Köln gerade Hilfe sucht."
               />
             </Reveal>
 
@@ -77,9 +73,9 @@ export default function ForProviders() {
 }
 
 const openJobs = [
-  { title: "Wohnungsreinigung", district: "Sülz", price: "85 €", fresh: true },
-  { title: "Möbelaufbau IKEA", district: "Nippes", price: "60 €" },
-  { title: "Gartenpflege", district: "Lindenthal", price: "120 €" },
+  { title: "Umzug 2 Zimmer, 3. OG", district: "Sülz", price: "280 €", fresh: true },
+  { title: "Waschmaschine tragen", district: "Nippes", price: "60 €" },
+  { title: "Keller ausräumen", district: "Lindenthal", price: "120 €" },
 ];
 
 /** A glimpse of the provider feed: what lands on their screen, nothing more. */

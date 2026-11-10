@@ -1,6 +1,6 @@
 # Datenmodell
 
-Stand: 16.09.2026. Gilt ab der Umstellung von numerischen IDs auf Dokument-IDs.
+Stand: 10.11.2026.
 
 ## Grundregeln
 
@@ -21,11 +21,20 @@ Daraus folgt dreierlei:
 **Geld** liegt immer als Integer in Cent vor, Obergrenze 100.000.000 (1 Mio. €).
 
 **Orte** haben überall dieselbe Form: `place: { geo: GeoPoint, address, city }`.
+In öffentlichen Dokumenten (Aufträge, Services) steht darin nur der Stadtteil,
+und die Koordinaten sind auf zwei Nachkommastellen gerundet, also auf etwa einen
+Kilometer. `publicPlace()` in `lib/utils/place.ts` ist die einzige Stelle, die
+das tut. Die genaue Adresse eines Auftrags liegt getrennt, siehe unten.
+
+**Kontaktdaten** wandern nie über das Profil. Wer sich festlegt, legt seine
+eigenen `{ email, phone }` als Schnappschuss ins Dokument: der Anbieter ins
+Angebot, der Kunde in die Anfrage. Der Job bekommt beide. So braucht niemand
+Leserechte auf fremde Profile, und Kontaktdaten gibt es erst mit der Zusage.
 
 **Radien** heißen überall `radiusKm` und sind Kilometer.
 
-**Enum-Werte sind Codes, keine Anzeigetexte.** Die deutschen Labels liegen in
-`lib/utils/format.ts` und den `*_LABEL`-Maps neben den Typen.
+**Enum-Werte sind Codes, keine Anzeigetexte.** Alle deutschen Statusnamen und
+ihre Farben stehen in einer einzigen Tabelle in `components/StatusPill.tsx`.
 
 ## Collections
 
@@ -35,6 +44,7 @@ categories/{slug}
 services/{id}
 orders/{id}
 orders/{id}/offers/{providerUid}
+orders/{id}/private/address
 bookings/{id}
 jobs/{id}
 ```
@@ -42,7 +52,8 @@ jobs/{id}
 ### users
 
 Dokument-ID ist die Auth-UID. Das Profil ist privat; Namen, die andere sehen,
-stehen denormalisiert in den jeweiligen Dokumenten.
+stehen denormalisiert in den jeweiligen Dokumenten. Die Rolle wird bei der
+Registrierung gewählt und lässt sich danach nicht mehr ändern.
 
 ### categories
 
@@ -63,7 +74,17 @@ Ausschreibungen eines Kunden. Status: `open`, `assigned`, `inProgress`,
 
 `offerCount` zählt die offenen Angebote und wird bei jedem Angebots-Write
 mitgeführt. Dadurch braucht eine Auftragsliste keinen Subcollection-Read, nur um
-„3 Angebote" anzuzeigen.
+„3 Angebote" anzuzeigen. Die Regeln koppeln den Zähler an das Angebot: er kann
+sich nur um eins ändern, und nur zusammen mit dem eigenen Angebot.
+
+Öffentlich sichtbar sind der Stadtteil und der abgekürzte Kundenname („Kim M.").
+Mit der Vergabe bekommt der Auftrag `assignedProviderId` und `jobId`.
+
+### orders/{id}/private/address
+
+Die genaue Adresse `{ address, geo }`. Lesen und schreiben darf nur der Kunde.
+Beim Annehmen eines Angebots kopiert die Transaktion sie in den Job, und erst
+dort sieht sie der beauftragte Anbieter.
 
 ### offers
 
@@ -71,10 +92,17 @@ Liegen unter `orders/{id}/offers/{providerUid}`. Die Anbieter-UID ist die
 Dokument-ID, deshalb ist „ein Angebot pro Anbieter pro Auftrag" eine Eigenschaft
 des Datenmodells und keine Regel, an die der Code sich erinnern muss.
 
+Nimmt der Kunde ein Angebot an, werden alle anderen offenen Angebote in
+derselben Transaktion abgelehnt. Ein Angebot lässt sich nur zurückziehen,
+solange der Auftrag offen ist.
+
 ### bookings
 
 Anfragen eines Kunden auf einen Service. Alle Snapshot-Felder werden innerhalb
-der Transaktion aus dem Service-Dokument kopiert, nicht vom Client übernommen.
+der Transaktion aus dem Service-Dokument kopiert, nicht vom Client übernommen;
+die Regeln vergleichen sie mit dem Service. Der Preisvorschlag des Kunden ist
+optional. Beim Annehmen nennt der Anbieter den endgültigen Preis, ohne Preis
+entsteht kein Job.
 
 ### jobs
 
@@ -89,6 +117,15 @@ Vier Status statt vorher sechs: `scheduled`, `inProgress`, `completed`,
 `cancelled`. Die alten `open`, `pending` und `accepted` bedeuteten alle
 „vereinbart, aber nicht begonnen", weshalb jede Übergangstabelle sie wieder
 zusammenfassen musste.
+
+Ein Job lässt sich nicht frei anlegen. Die Regeln verlangen, dass der Auftrag
+oder die Anfrage nach derselben Transaktion auf genau diesen Job zeigt und der
+Preis mit dem angenommenen Angebot übereinstimmt. Der Anbieter führt den Job
+(starten, abschließen, stornieren), der Kunde darf nur stornieren, solange er
+nicht begonnen hat. Bei Jobs aus Aufträgen folgt der Auftragsstatus dem Job.
+
+Jobs aus Anfragen tragen den Wunschtermin des Kunden als Freitext in `dateText`;
+`scheduledAt` ist dann der Zeitpunkt der Zusage und dient nur der Sortierung.
 
 ## Skripte
 
@@ -144,7 +181,8 @@ Prüfung läuft auch als Test in `tests/seedData.test.ts` mit.
 ## Rules und Indizes
 
 `firestore.rules` und `firestore.indexes.json` liegen im Projektwurzelverzeichnis,
-`firebase.json` verdrahtet beide.
+`firebase.json` verdrahtet beide. `tests/rules.test.ts` spielt die Abläufe und
+die naheliegenden Angriffe gegen den Emulator durch (`pnpm test:rules`).
 
 ```
 firebase deploy --only firestore:rules,firestore:indexes

@@ -2,6 +2,7 @@ import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore"
 import type { User } from "firebase/auth"
 import { db } from "@/lib/firebase/firebase"
 import type { AppUser, UserRole } from "@/lib/types/user"
+import type { Contact } from "@/lib/types/common"
 import { fullName } from "@/lib/types/user"
 
 /**
@@ -14,7 +15,7 @@ import { fullName } from "@/lib/types/user"
  */
 export async function getAppUser(
   user: User,
-  fallbackRole: UserRole = "provider",
+  fallbackRole: UserRole = "customer",
   displayName = user.displayName ?? "",
 ): Promise<AppUser> {
   const userRef = doc(db, "users", user.uid)
@@ -31,7 +32,6 @@ export async function getAppUser(
     lastName: typeof data.lastName === "string" && data.lastName ? data.lastName : rest.join(" "),
     phone: typeof data.phone === "string" ? data.phone : "",
     company: typeof data.company === "string" ? data.company : "",
-    notificationsEnabled: typeof data.notificationsEnabled === "boolean" ? data.notificationsEnabled : true,
   }
 
   // Only write when something actually differs, so signing in is a pure read.
@@ -51,12 +51,18 @@ export async function getAppUser(
     uid: user.uid,
     email: profile.email,
     displayName: fullName(profile) || displayName || profile.email,
+    phone: profile.phone,
     role,
   }
 }
 
+/** What the other side of a job gets to see. */
+export function contactOf(user: Pick<AppUser, "email" | "phone">): Contact {
+  return { email: user.email, phone: user.phone }
+}
+
 export function getHomeForRole(role: UserRole) {
-  return role === "customer" ? "/find-services" : "/dashboard"
+  return role === "customer" ? "/customer-dashboard" : "/dashboard"
 }
 
 export function getProfileForRole(role: UserRole) {

@@ -1,461 +1,253 @@
 "use client"
 
 import { useCallback, useMemo, useRef, useState } from "react"
-import {
-  ChevronDown,
-  LayoutGrid,
-  Map as MapIcon,
-  MapPin,
-  Search,
-  SlidersHorizontal,
-  Tag,
-  X,
-} from "lucide-react"
+import { LayoutGrid, Map as MapIcon, MapPin, Search, SlidersHorizontal } from "lucide-react"
 import { haversineDistanceInKm } from "@/lib/utils/geo"
 import { useOpenOrders } from "@/lib/hooks/useOrders"
-import { useLocationSuggestions } from "@/lib/hooks/useLocationSuggestions"
 import { useCategories } from "@/lib/hooks/useCategories"
 import { useGoogleMaps } from "@/lib/hooks/useGoogleMaps"
+import type { LocationSuggestion } from "@/lib/hooks/useLocationSuggestions"
 import { DetailPanel, MapView, type RankedOrder } from "@/components/find-jobs/OrderMap"
 import OrderCard from "@/components/find-jobs/OrderCard"
-import { formatEuro, formatDate } from "@/lib/utils/format"
+import LocationField from "@/components/LocationField"
+import ListState from "@/components/ListState"
+import { formatDate, formatEuro } from "@/lib/utils/format"
 
-type LocationSuggestion = { lat: number; lon: number; label: string }
+const RADIUS_OPTIONS = [5, 10, 20, 30]
+const PAGE_SIZE = 10
 
-const RADIUS_OPTIONS = [5, 10, 15, 20, 30]
-const ORDERS_PER_PAGE = 10
-
-/**
- * Scores how well an order fits the current filters, 0–100.
- * Text and category matches weigh most; proximity breaks the tie.
- */
-function scoreOrder(order: RankedOrder, hasQuery: boolean, titleHit: boolean, hasCategory: boolean) {
-  const text = hasQuery ? (titleHit ? 40 : 25) : 30
-  const category = hasCategory ? 30 : 25
-  const proximity =
-    order.distanceKm === null ? 20 : Math.max(0, Math.round(25 - order.distanceKm))
-  const freshness = order.offerCount === 0 ? 15 : Math.max(0, 15 - order.offerCount * 3)
-  return Math.min(100, text + category + proximity + freshness)
-}
-
+/** Open orders, nearest first once a place is picked, newest first otherwise. */
 export default function FindOrders() {
   const { orders, loading, error } = useOpenOrders()
   const { categories } = useCategories()
 
   const [query, setQuery] = useState("")
-  const [locationQuery, setLocationQuery] = useState("")
-  const [selectedLocation, setSelectedLocation] = useState<LocationSuggestion | null>(null)
-  const {
-    suggestions: locationSuggestions,
-    loading: locationLoading,
-    error: locationError,
-  } = useLocationSuggestions(locationQuery, selectedLocation)
+  const [placeText, setPlaceText] = useState("")
+  const [place, setPlace] = useState<LocationSuggestion | null>(null)
   const [radiusKm, setRadiusKm] = useState(10)
   const [categoryId, setCategoryId] = useState("")
-  const [subcategoryId, setSubcategoryId] = useState("")
 
-  const [selectedOrder, setSelectedOrder] = useState<RankedOrder | null>(null)
-  const [viewMode, setViewMode] = useState<"map" | "list">("map")
-  const [filtersOpen, setFiltersOpen] = useState(true)
-  const { ready: mapsReady, error: mapsError } = useGoogleMaps(viewMode === "map")
-  const [page, setPage] = useState(1)
+  const [view, setView] = useState<"map" | "list">("list")
+  // Filters start open on wide screens and folded on phones, where the map needs the room.
+  const [filtersOpen, setFiltersOpen] = useState(
+    () => typeof window === "undefined" || window.matchMedia("(min-width: 768px)").matches,
+  )
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [pageCount, setPageCount] = useState(1)
+  const { ready: mapsReady, error: mapsError } = useGoogleMaps(view === "map")
   const listRef = useRef<HTMLDivElement>(null)
 
-  const category = useMemo(
-    () => categories.find((entry) => entry.id === categoryId),
-    [categories, categoryId],
-  )
-  const subcategories = category?.subcategories ?? []
-  const locationActive = Boolean(selectedLocation)
-
-  const filtered = useMemo<RankedOrder[]>(() => {
+  const results = useMemo<RankedOrder[]>(() => {
     const search = query.trim().toLowerCase()
-
-    return orders
+    const ranked = orders
       .map((order) => ({
         ...order,
-        distanceKm: selectedLocation
-          ? haversineDistanceInKm(selectedLocation, {
-              lat: order.place.geo.latitude,
-              lon: order.place.geo.longitude,
-            })
+        distanceKm: place
+          ? haversineDistanceInKm(place, { lat: order.place.geo.latitude, lon: order.place.geo.longitude })
           : null,
-        matchScore: 0,
       }))
       .filter((order) => {
         if (categoryId && order.categoryId !== categoryId) return false
-        if (subcategoryId && order.subcategoryId !== subcategoryId) return false
-        if (selectedLocation && (order.distanceKm ?? Infinity) > radiusKm) return false
-        if (!search) return true
-        return (
-          order.title.toLowerCase().includes(search) ||
-          order.customerName.toLowerCase().includes(search) ||
-          order.description.toLowerCase().includes(search)
-        )
+        if (order.distanceKm !== null && order.distanceKm > radiusKm) return false
+        return !search || `${order.title} ${order.description}`.toLowerCase().includes(search)
       })
-      .map((order) => ({
-        ...order,
-        matchScore: scoreOrder(
-          order,
-          Boolean(search),
-          Boolean(search) && order.title.toLowerCase().includes(search),
-          Boolean(categoryId),
-        ),
-      }))
-      .sort((a, b) => b.matchScore - a.matchScore)
-  }, [categoryId, orders, query, radiusKm, selectedLocation, subcategoryId])
+    return place ? ranked.sort((a, b) => a.distanceKm! - b.distanceKm!) : ranked
+  }, [categoryId, orders, place, query, radiusKm])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ORDERS_PER_PAGE))
-  const currentPage = Math.min(page, totalPages)
-  const paginated = useMemo(
-    () => filtered.slice((currentPage - 1) * ORDERS_PER_PAGE, currentPage * ORDERS_PER_PAGE),
-    [currentPage, filtered],
-  )
+  const selected = results.find((order) => order.id === selectedId) ?? null
+  const visible = results.slice(0, pageCount * PAGE_SIZE)
+  const filtered = Boolean(query || place || categoryId)
 
-  const visibleSelectedOrder = filtered.find((order) => order.id === selectedOrder?.id) ?? null
-
-  const locationHint = useMemo(() => {
-    if (!locationQuery.trim()) return null
-    if (!selectedLocation) return "Bitte einen Ort aus den Vorschlägen auswählen, damit der Radiusfilter greift."
-    return `Radius wird zu "${selectedLocation.label}" berechnet.`
-  }, [locationQuery, selectedLocation])
-
-  function resetFilters() {
-    setQuery("")
-    setLocationQuery("")
-    setSelectedLocation(null)
-    setRadiusKm(10)
-    setCategoryId("")
-    setSubcategoryId("")
-    setSelectedOrder(null)
-    setPage(1)
-  }
-
-  const handleOrderSelect = useCallback((order: RankedOrder | null) => {
-    setSelectedOrder(order)
-    if (order && listRef.current) {
-      listRef.current
-        .querySelector(`[data-order-id="${order.id}"]`)
-        ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+  const select = useCallback((order: RankedOrder | null) => {
+    setSelectedId(order?.id ?? null)
+    if (order) {
+      listRef.current?.querySelector(`[data-order-id="${order.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "nearest" })
     }
   }, [])
+
+  function reset() {
+    setQuery("")
+    setPlaceText("")
+    setPlace(null)
+    setCategoryId("")
+    setSelectedId(null)
+  }
 
   return (
     <main id="main" className="app-viewport flex min-h-[600px] flex-col overflow-hidden">
       <div className="flex-none border-b border-secondary bg-background px-4 py-4 sm:px-6 md:px-10 md:py-5">
-        <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${filtersOpen ? "mb-4" : ""}`}>
-          <div className="flex min-w-0 flex-1 items-center gap-2.5">
-            <h1 className="page-title whitespace-nowrap">Aufträge finden</h1>
-            {!loading && <span className="pill pill-primary num">{filtered.length}</span>}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <h1 className="page-title whitespace-nowrap">Aufträge</h1>
+            {!loading && <span className="pill pill-primary num">{results.length}</span>}
           </div>
 
-          <div className="flex flex-none items-center justify-between gap-1 sm:justify-start">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => setFiltersOpen((open) => !open)}
               aria-expanded={filtersOpen}
-              aria-controls="job-search-filters"
-              className="flex h-9 items-center gap-1.5 rounded-md border border-secondary px-2.5 text-[13px] font-medium text-text/60 transition-colors hover:bg-muted hover:text-text sm:px-3"
+              aria-controls="job-filters"
+              data-active={filtersOpen}
+              className="icon-btn data-[active=true]:text-primary"
+              aria-label="Filter"
             >
-              <SlidersHorizontal size={14} strokeWidth={1.9} aria-hidden />
-              <span className="hidden sm:inline">Filter</span>
-              <ChevronDown className={`transition-transform ${filtersOpen ? "rotate-180" : ""}`} size={14} aria-hidden />
+              <SlidersHorizontal size={17} strokeWidth={1.9} aria-hidden />
             </button>
             <div className="flex items-center gap-1 rounded-md border border-secondary p-1">
-              {(
-                [
-                  { key: "map" as const, label: "Karte", icon: MapIcon },
-                  { key: "list" as const, label: "Liste", icon: LayoutGrid },
-                ]
-              ).map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setViewMode(key)}
-                data-active={viewMode === key ? "true" : "false"}
-                className="flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[13px] font-medium text-text/55 transition-colors hover:text-text data-[active=true]:bg-primary data-[active=true]:text-white"
-              >
-                <Icon size={14} strokeWidth={1.9} aria-hidden />
-                <span className="hidden sm:inline">{label}</span>
-              </button>
+              {([
+                { key: "list", label: "Liste", icon: LayoutGrid },
+                { key: "map", label: "Karte", icon: MapIcon },
+              ] as const).map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setView(key)}
+                  data-active={view === key}
+                  aria-pressed={view === key}
+                  className="flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[13px] font-medium text-text/55 transition-colors hover:text-text data-[active=true]:bg-primary data-[active=true]:text-white"
+                >
+                  <Icon size={14} strokeWidth={1.9} aria-hidden />
+                  <span className="hidden sm:inline">{label}</span>
+                </button>
               ))}
             </div>
           </div>
         </div>
 
-        <form
-          id="job-search-filters"
-          className={filtersOpen ? "block" : "hidden"}
-          onSubmit={(event) => {
-            event.preventDefault()
-            setFiltersOpen(false)
-          }}
-        >
-          <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto_auto]">
+        <div id="job-filters" hidden={!filtersOpen} className="mt-4 grid gap-2.5 md:grid-cols-[1.2fr_1.4fr_0.7fr_1fr]">
           <div className="field-group field-h">
             <Search size={15} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
             <input
-              type="text"
-              placeholder="Titel, Beschreibung oder Kunde…"
-              aria-label="Suche"
               value={query}
-              onChange={(event) => {
-                setQuery(event.target.value)
-                setPage(1)
-              }}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Stichwort"
+              aria-label="Suche"
             />
           </div>
 
-          <div className="relative">
-            <div className="field-group field-h">
-              <MapPin size={15} strokeWidth={1.8} className="flex-none text-text/30" aria-hidden />
-              <input
-                type="text"
-                placeholder="Ort oder Straße in Köln…"
-                aria-label="Ort"
-                value={locationQuery}
-                onChange={(event) => {
-                  setLocationQuery(event.target.value)
-                  setSelectedLocation(null)
-                }}
-              />
-            </div>
-            {locationQuery.trim().length >= 2 && !selectedLocation && (
-              <div className="sheet absolute left-0 right-0 z-30 mt-2 overflow-hidden p-1">
-                {locationLoading && (
-                  <p className="px-3 py-2.5 text-[13px] text-text/50">Vorschläge werden geladen…</p>
-                )}
-                {!locationLoading && locationSuggestions.length === 0 && !locationError && (
-                  <p className="px-3 py-2.5 text-[13px] text-text/50">Keine Vorschläge gefunden.</p>
-                )}
-                {!locationLoading &&
-                  locationSuggestions.map((suggestion) => (
-                    <button
-                      key={`${suggestion.label}-${suggestion.lat}-${suggestion.lon}`}
-                      type="button"
-                      onClick={() => {
-                        setLocationQuery(suggestion.label)
-                        setSelectedLocation(suggestion)
-                        setPage(1)
-                      }}
-                      className="block w-full rounded-sm px-3 py-2.5 text-left text-[13.5px] text-text transition-colors hover:bg-muted"
-                    >
-                      {suggestion.label}
-                    </button>
-                  ))}
-              </div>
-            )}
-          </div>
+          <LocationField
+            label={null}
+            placeholder="Von wo aus fährst du?"
+            value={placeText}
+            selected={place}
+            onChange={(value) => {
+              setPlaceText(value)
+              setPlace(null)
+            }}
+            onSelect={(suggestion) => {
+              setPlaceText(suggestion.label)
+              setPlace(suggestion)
+            }}
+          />
 
           <select
-            aria-label="Radius"
+            aria-label="Umkreis"
             value={radiusKm}
             onChange={(event) => setRadiusKm(Number(event.target.value))}
-            disabled={!locationActive}
+            disabled={!place}
             className="field field-h field-select"
           >
             {RADIUS_OPTIONS.map((radius) => (
               <option key={radius} value={radius}>
-                {radius} km Radius
+                {radius} km
               </option>
             ))}
           </select>
 
-          <div className="flex gap-2">
-            <button type="submit" className="btn btn-primary flex-1 lg:flex-none">
-              <Search size={14} strokeWidth={2} aria-hidden />
-              Suchen
-            </button>
-            <button type="button" onClick={resetFilters} className="btn btn-outline flex-1 lg:flex-none">
-              <X size={14} strokeWidth={2} aria-hidden />
-              Zurücksetzen
-            </button>
-          </div>
-          </div>
-
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          <Tag size={14} strokeWidth={1.8} className="text-text/30" aria-hidden />
           <select
             aria-label="Kategorie"
             value={categoryId}
-            onChange={(event) => {
-              setCategoryId(event.target.value)
-              setSubcategoryId("")
-              setPage(1)
-            }}
-            className="field field-select w-auto py-2 text-[13px]"
+            onChange={(event) => setCategoryId(event.target.value)}
+            className="field field-h field-select"
           >
             <option value="">Alle Kategorien</option>
-            {categories.map((entry) => (
-              <option key={entry.id} value={entry.id}>
-                {entry.nameDE}
-              </option>
-            ))}
-          </select>
-
-          <select
-            aria-label="Unterkategorie"
-            value={subcategoryId}
-            onChange={(event) => {
-              setSubcategoryId(event.target.value)
-              setPage(1)
-            }}
-            disabled={!category}
-            className="field field-select w-auto py-2 text-[13px]"
-          >
-            <option value="">Alle Unterkategorien</option>
-            {subcategories.map((entry) => (
-              <option key={entry.slug} value={entry.slug}>
-                {entry.nameDE}
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.nameDE}
               </option>
             ))}
           </select>
         </div>
-
-        {(locationHint || locationError) && (
-          <p className="mt-2.5 text-[12px] text-text/40">{locationError ?? locationHint}</p>
-        )}
-        </form>
       </div>
 
-      {loading && (
-        <div className="flex flex-1 items-center justify-center">
-          <span className="flex items-center gap-2.5 text-[13px] text-text/40">
-            <span className="dot-live text-accent" aria-hidden />
-            Aufträge werden geladen
-          </span>
-        </div>
-      )}
-
-      {error && (
-        <div className="flex flex-1 items-center justify-center px-6">
-          <p role="alert" className="notice notice-error">
-            {error}
-          </p>
-        </div>
-      )}
-
-      {!loading && !error && viewMode === "list" && (
-        <div className="flex-1 overflow-y-auto px-6 py-6 md:px-10">
-          {filtered.length === 0 ? (
-            <div className="empty">
-              <p className="text-[15px] text-text/50">
-                Keine Aufträge mit den gewählten Filtern gefunden.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-col gap-4">
-                {paginated.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    matchScore={order.matchScore}
-                    distanceKm={order.distanceKm}
-                  />
-                ))}
-              </div>
-
-              {filtered.length > ORDERS_PER_PAGE && (
-                <div className="mt-8 flex items-center justify-between gap-3 border-t border-secondary pt-6 text-[13.5px] text-text/60">
-                  <p className="num">
-                    Seite {currentPage} von {totalPages}
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPage(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
-                      className="btn btn-outline btn-sm"
-                    >
-                      Zurück
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage === totalPages}
-                      className="btn btn-outline btn-sm"
-                    >
-                      Weiter
-                    </button>
-                  </div>
-                </div>
+      {view === "list" && (
+        <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 md:px-10">
+          <div className="mx-auto flex max-w-4xl flex-col gap-4">
+            <ListState
+              loading={loading}
+              error={error}
+              empty={results.length === 0}
+              emptyText={filtered ? "Keine Aufträge mit diesen Filtern." : "Gerade sind keine Aufträge offen. Neue erscheinen hier sofort."}
+            >
+              {filtered && (
+                <button type="button" onClick={reset} className="btn btn-outline">
+                  Filter zurücksetzen
+                </button>
               )}
-            </>
-          )}
+            </ListState>
+
+            {visible.map((order) => (
+              <OrderCard key={order.id} order={order} distanceKm={order.distanceKm} />
+            ))}
+
+            {visible.length < results.length && (
+              <button type="button" onClick={() => setPageCount((count) => count + 1)} className="btn btn-outline mx-auto mt-2">
+                Mehr anzeigen
+              </button>
+            )}
+          </div>
         </div>
       )}
 
-      {!loading && !error && viewMode === "map" && (
+      {view === "map" && (
         <div className="relative flex min-h-0 flex-1 flex-col">
           <div className="job-map relative">
-            {mapsReady ? (
-              <MapView
-                orders={filtered}
-                selectedOrder={visibleSelectedOrder}
-                onOrderSelect={handleOrderSelect}
-              />
+            {mapsReady && !loading ? (
+              <MapView orders={results} selectedOrder={selected} onOrderSelect={select} />
             ) : (
-              <div className="flex h-full items-center justify-center bg-muted">
-                <p className="text-[13px] text-text/40">{mapsError ?? "Karte wird geladen…"}</p>
+              <div className="flex h-full items-center justify-center bg-muted px-6 text-center">
+                <p className="text-[13px] text-text/40">{error ?? mapsError ?? "Karte wird geladen…"}</p>
               </div>
             )}
-
-            <div className="num pointer-events-none absolute left-4 top-4 rounded-full border border-secondary bg-background/90 px-3.5 py-1.5 text-[12.5px] font-semibold text-primary shadow-sm backdrop-blur-md">
-              {filtered.length} {filtered.length === 1 ? "Auftrag" : "Aufträge"}
-            </div>
           </div>
 
           <div className="relative flex min-h-0 flex-1 border-t border-secondary">
             <div
               className={`map-detail-panel overflow-hidden border-r border-secondary transition-all duration-300 ${
-                visibleSelectedOrder ? "is-open sm:w-[420px] lg:w-[500px]" : "w-0"
+                selected ? "is-open sm:w-[420px] lg:w-[500px]" : "w-0"
               }`}
             >
-              {visibleSelectedOrder && (
-                <DetailPanel order={visibleSelectedOrder} onClose={() => setSelectedOrder(null)} />
-              )}
+              {selected && <DetailPanel order={selected} onClose={() => setSelectedId(null)} />}
             </div>
 
             <div ref={listRef} className="map-results flex-1 overflow-y-auto">
-              {filtered.length === 0 ? (
-                <div className="flex h-full items-center justify-center">
-                  <p className="text-[13px] text-text/40">Keine Aufträge gefunden.</p>
-                </div>
+              {results.length === 0 ? (
+                <p className="flex h-full items-center justify-center text-[13px] text-text/40">Keine Aufträge gefunden.</p>
               ) : (
                 <div className="flex flex-col divide-y divide-secondary">
-                  {filtered.map((order) => (
+                  {results.map((order) => (
                     <button
                       key={order.id}
                       type="button"
                       data-order-id={order.id}
-                      onClick={() => handleOrderSelect(selectedOrder?.id === order.id ? null : order)}
-                      data-active={selectedOrder?.id === order.id ? "true" : "false"}
+                      onClick={() => select(selectedId === order.id ? null : order)}
+                      data-active={selectedId === order.id}
                       className="w-full border-l-2 border-l-transparent px-4 py-3.5 text-left transition-colors duration-150 hover:bg-muted data-[active=true]:border-l-accent data-[active=true]:bg-accent/6"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="truncate text-[14px] font-medium leading-snug text-text">
-                            {order.title}
+                          <p className="truncate text-[14px] font-medium leading-snug text-text">{order.title}</p>
+                          <p className="mt-1 flex items-center gap-1 truncate text-[11.5px] text-text/45">
+                            <MapPin size={10} strokeWidth={1.8} aria-hidden />
+                            {order.place.city}
                           </p>
-                          <div className="mt-1 flex items-center gap-2">
-                            <span className="text-[11.5px] text-text/45">{order.categoryName}</span>
-                            <span aria-hidden className="text-text/20">
-                              ·
-                            </span>
-                            <span className="flex items-center gap-1 truncate text-[11.5px] text-text/45">
-                              <MapPin size={10} strokeWidth={1.8} aria-hidden />
-                              {order.place.city}
-                            </span>
-                          </div>
                         </div>
                         <div className="flex-none text-right">
                           <p className="num text-[13.5px] font-semibold text-primary">
                             {formatEuro(order.budgetInCent, { decimals: false })} €
                           </p>
-                          <p className="mt-0.5 text-[11.5px] text-text/40">
-                            {formatDate(order.timeWindow.start)}
-                          </p>
+                          <p className="mt-0.5 text-[11.5px] text-text/40">{formatDate(order.timeWindow.start)}</p>
                         </div>
                       </div>
                     </button>

@@ -6,6 +6,7 @@ import { requireAppUser } from "@/lib/firebase/currentUser"
 import { assertMoney, newId, withoutUndefined } from "@/lib/utils/validation"
 import { ServiceStatus } from "@/lib/types/service"
 import type { Place, Pricing } from "@/lib/types/common"
+import { publicPlace } from "@/lib/utils/place"
 
 export interface ServiceInput {
   title: string
@@ -30,6 +31,7 @@ export function validateService(input: ServiceInput) {
   if (input.maxPriceInCent < input.minPriceInCent) throw new Error("Der Höchstpreis darf nicht unter dem Mindestpreis liegen.")
   if (!Number.isFinite(input.radiusKm) || input.radiusKm <= 0) throw new Error("Ungültiger Radius.")
   if (!input.categoryId) throw new Error("Bitte eine Kategorie auswählen.")
+  if (input.imageUrl && !input.imageUrl.startsWith("https://")) throw new Error("Die Bild-URL muss mit https:// beginnen.")
   if (!input.place?.geo || (input.place.geo.latitude === 0 && input.place.geo.longitude === 0)) {
     throw new Error("Bitte einen gültigen Standort auswählen.")
   }
@@ -49,6 +51,7 @@ export async function createService(input: ServiceInput) {
     doc(db, "services", id),
     withoutUndefined({
       ...input,
+      place: publicPlace(input.place),
       providerId: user.uid,
       providerName: user.displayName,
       createdAt: serverTimestamp(),
@@ -69,7 +72,7 @@ export async function updateService(serviceId: string, input: ServiceInput) {
     if (!service || service.providerId !== user.uid || service.status === ServiceStatus.archived) {
       throw new Error("Service nicht gefunden.")
     }
-    transaction.update(ref, { ...withoutUndefined(input), updatedAt: serverTimestamp() })
+    transaction.update(ref, { ...withoutUndefined(input), place: publicPlace(input.place), updatedAt: serverTimestamp() })
   })
 }
 

@@ -8,3 +8,11 @@ export function haversineDistanceInKm(from: Coordinates, to: Coordinates) {
   const bounded = Math.min(1, Math.max(0, a))
   return 6371 * 2 * Math.atan2(Math.sqrt(bounded), Math.sqrt(1 - bounded))
 }
+
+/**
+ * Two decimals is roughly a kilometre in Cologne: precise enough to sort by
+ * distance and place a pin in the right district, too coarse to find a door.
+ */
+export function roundCoordinate(value: number) {
+  return Math.round(value * 100) / 100
+}

@@ -1,27 +1,27 @@
-import { Lock, ShieldCheck, Star, Users } from "lucide-react";
+import { Euro, Handshake, Lock, MapPinOff } from "lucide-react";
 import Reveal from "@/components/motion/Reveal";
 import SectionHeading from "./SectionHeading";
 
 const trustPoints = [
   {
-    icon: ShieldCheck,
-    title: "Geprüfte Profile",
-    text: "Jeder Dienstleister verifiziert seine Identität und Kontaktdaten, bevor er Aufträge annehmen kann.",
+    icon: MapPinOff,
+    title: "Deine Adresse bleibt privat",
+    text: "Dienstleister sehen nur den Stadtteil. Die genaue Adresse bekommt nur, wen du beauftragst.",
   },
   {
-    icon: Star,
-    title: "Ehrliche Bewertungen",
-    text: "Feedback gibt es nur nach abgeschlossenen Aufträgen. Kein Fake, keine gekauften Sterne.",
+    icon: Euro,
+    title: "Der Preis steht vorher fest",
+    text: "Du siehst jeden Preis, bevor du zusagst. Ohne deine Zusage ist nichts vereinbart.",
   },
   {
-    icon: Users,
-    title: "Klare Kommunikation",
-    text: "Alle Nachrichten dokumentiert im Chat. Bei Problemen ist nachvollziehbar, was besprochen wurde.",
+    icon: Handshake,
+    title: "Kontakt erst nach Zusage",
+    text: "Telefon und E-Mail werden erst ausgetauscht, wenn beide Seiten zugestimmt haben.",
   },
   {
     icon: Lock,
-    title: "Datenschutz nach DSGVO",
-    text: "Deine Daten gehören dir. Kein Weiterverkauf, keine Werbenetzwerke, keine versteckten Tracker.",
+    title: "Keine Werbung, kein Tracking",
+    text: "Keine Werbenetzwerke, kein Weiterverkauf von Daten. Wir speichern nur, was der Ablauf braucht.",
   },
 ];
 
@@ -35,7 +35,7 @@ export default function Trust() {
               id="trust-heading"
               eyebrow="Warum LiNQ"
               title="Vertrauen, das man nicht versprechen muss."
-              description="Eine gute Plattform wird nicht durch Marketing sicher, sondern durch den Ablauf. Deshalb haben wir Vertrauen in jeden Schritt eingebaut."
+              description="Eine Plattform wird nicht durch Marketing sicher, sondern durch den Ablauf. Deshalb steckt der Schutz im Ablauf selbst."
             />
           </Reveal>
 

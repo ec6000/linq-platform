@@ -1,13 +1,26 @@
 "use client"
 
-import { doc, increment, runTransaction, serverTimestamp } from "firebase/firestore"
+import {
+  collection,
+  doc,
+  getDocs,
+  increment,
+  query,
+  runTransaction,
+  serverTimestamp,
+  where,
+} from "firebase/firestore"
 import { db } from "@/lib/firebase/firebase"
 import { requireAppUser } from "@/lib/firebase/currentUser"
+import { contactOf } from "@/lib/utils/auth"
 import { assertMoney, newId, withoutUndefined } from "@/lib/utils/validation"
+import { privateAddressRef } from "@/lib/data/orders"
 import { OfferStatus } from "@/lib/types/offer"
 import { OrderStatus } from "@/lib/types/order"
 import { JobSourceType, JobStatus } from "@/lib/types/job"
 import { PricingType } from "@/lib/types/common"
+
+export const MAX_OFFER_MESSAGE = 500
 
 /**
  * `orders/{orderId}/offers/{providerId}` — the provider's UID is the document
@@ -22,7 +35,7 @@ export async function createOffer(orderId: string, priceInCent: number, message:
   const user = await requireAppUser("provider")
   assertMoney(priceInCent)
   if (priceInCent <= 0) throw new Error("Bitte einen Preis über 0 € angeben.")
-  if (message.trim().length > 500) throw new Error("Der Kommentar ist zu lang.")
+  if (message.trim().length > MAX_OFFER_MESSAGE) throw new Error("Der Kommentar ist zu lang.")
 
   await runTransaction(db, async (transaction) => {
     const orderRef = doc(db, "orders", orderId)
@@ -30,7 +43,6 @@ export async function createOffer(orderId: string, priceInCent: number, message:
     const existing = await transaction.get(offerRef(orderId, user.uid))
 
     if (!order || order.status !== OrderStatus.open) throw new Error("Der Auftrag ist nicht mehr verfügbar.")
-    if (order.customerId === user.uid) throw new Error("Auf eigene Aufträge kann man nicht bieten.")
     if (existing.exists()) throw new Error("Du hast bereits ein Angebot für diesen Auftrag abgegeben.")
 
     transaction.set(offerRef(orderId, user.uid), {
@@ -38,6 +50,7 @@ export async function createOffer(orderId: string, priceInCent: number, message:
       orderTitle: order.title,
       providerId: user.uid,
       providerName: user.displayName,
+      providerContact: contactOf(user),
       priceInCent,
       message: message.trim(),
       status: OfferStatus.pending,
@@ -54,11 +67,13 @@ export async function withdrawOffer(orderId: string) {
   await runTransaction(db, async (transaction) => {
     const orderRef = doc(db, "orders", orderId)
     const ref = offerRef(orderId, user.uid)
-    const snapshot = await transaction.get(ref)
-    const offer = snapshot.data()
+    const order = (await transaction.get(orderRef)).data()
+    const offer = (await transaction.get(ref)).data()
     if (!offer || offer.status !== OfferStatus.pending) {
       throw new Error("Nur eigene offene Angebote können zurückgezogen werden.")
     }
+    // Once the customer has chosen, the count is closed and must not drift below zero.
+    if (order?.status !== OrderStatus.open) throw new Error("Der Auftrag ist bereits entschieden.")
     transaction.delete(ref)
     transaction.update(orderRef, { offerCount: increment(-1), updatedAt: serverTimestamp() })
   })
@@ -66,40 +81,47 @@ export async function withdrawOffer(orderId: string) {
 
 /**
  * Accepting an offer is the hinge of flow B: it assigns the order, creates the
- * job and closes the bidding — all in one transaction, so the three can never
- * disagree about who won.
+ * job, closes every competing offer and hands over the exact address — all in
+ * one transaction, so none of them can ever disagree about who won.
  */
 export async function decideOffer(
   orderId: string,
   providerId: string,
   decision: OfferStatus.accepted | OfferStatus.declined,
-  comment = "",
 ) {
   const user = await requireAppUser("customer")
+  const orderRef = doc(db, "orders", orderId)
+  const ref = offerRef(orderId, providerId)
+
+  // Queries cannot run inside a client transaction, so collect the competing
+  // offers first and re-read each one inside it.
+  const rivals =
+    decision === OfferStatus.accepted
+      ? (await getDocs(query(collection(orderRef, "offers"), where("status", "==", OfferStatus.pending))))
+          .docs.filter((snapshot) => snapshot.id !== providerId)
+          .map((snapshot) => snapshot.ref)
+      : []
 
   return runTransaction(db, async (transaction) => {
-    const orderRef = doc(db, "orders", orderId)
-    const ref = offerRef(orderId, providerId)
-    const orderSnapshot = await transaction.get(orderRef)
-    const offerSnapshot = await transaction.get(ref)
-    const order = orderSnapshot.data()
-    const offer = offerSnapshot.data()
-
+    const order = (await transaction.get(orderRef)).data()
+    const offer = (await transaction.get(ref)).data()
     if (!order || order.customerId !== user.uid || !offer) throw new Error("Angebot nicht gefunden.")
     if (order.status !== OrderStatus.open || offer.status !== OfferStatus.pending) {
       throw new Error("Dieses Angebot kann nicht mehr geändert werden.")
     }
 
-    transaction.update(ref, {
-      status: decision,
-      customerComment: comment.trim(),
-      decidedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
+    const decided = { decidedAt: serverTimestamp(), updatedAt: serverTimestamp() }
 
     if (decision === OfferStatus.declined) {
+      transaction.update(ref, { status: OfferStatus.declined, ...decided })
       transaction.update(orderRef, { offerCount: increment(-1), updatedAt: serverTimestamp() })
       return null
+    }
+
+    const address = (await transaction.get(privateAddressRef(orderId))).data()
+    const pendingRivals = []
+    for (const rival of rivals) {
+      if ((await transaction.get(rival)).data()?.status === OfferStatus.pending) pendingRivals.push(rival)
     }
 
     assertMoney(offer.priceInCent)
@@ -110,9 +132,11 @@ export async function decideOffer(
         sourceType: JobSourceType.order,
         sourceId: orderId,
         customerId: order.customerId,
-        customerName: order.customerName,
+        customerName: user.displayName,
+        customerContact: contactOf(user),
         providerId: offer.providerId,
         providerName: offer.providerName,
+        providerContact: offer.providerContact,
         title: order.title,
         description: order.description,
         categoryId: order.categoryId,
@@ -121,20 +145,22 @@ export async function decideOffer(
         subcategoryName: order.subcategoryName,
         pricing: { type: PricingType.fixed },
         priceInCent: offer.priceInCent,
-        place: order.place,
-        scheduledAt: order.timeWindow?.start,
+        place: address ? { ...order.place, ...address } : order.place,
+        scheduledAt: order.timeWindow.start,
         status: JobStatus.scheduled,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       }),
     )
 
+    transaction.update(ref, { status: OfferStatus.accepted, ...decided })
+    for (const rival of pendingRivals) transaction.update(rival, { status: OfferStatus.declined, ...decided })
     transaction.update(orderRef, {
       status: OrderStatus.assigned,
       assignedProviderId: offer.providerId,
       assignedProviderName: offer.providerName,
+      jobId,
       assignedAt: serverTimestamp(),
-      // Bidding is over; the remaining offers stay for the record but no longer count.
       offerCount: 0,
       updatedAt: serverTimestamp(),
     })

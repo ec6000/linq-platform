@@ -2,69 +2,54 @@ rules_version = '2';
 
 // LiNQ Firestore Security Rules
 //
-// These became expressible only with the current data model: every reference
-// (`customerId`, `providerId`, `assignedProviderId`, and the offer document ID)
-// is a Firebase Auth UID, so a rule can compare it to `request.auth.uid`
-// directly. Under the previous numeric-ID model there was no way to tie a
-// document to the caller, and the client was the only thing standing between a
-// user and someone else's data.
+// The client is never trusted. Every write that matters is tied to the
+// documents it claims to come from: a job can only exist if its order or
+// booking points back at it in the same transaction, an order's offer count
+// can only move together with an offer, and a booking copies its service
+// instead of inventing a price or a provider.
 //
-// Deploy with:  firebase deploy --only firestore:rules
+// tests/rules.test.ts runs these rules against the emulator: `pnpm test:rules`.
+// Deploy with: firebase deploy --only firestore:rules
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    function signedIn() {
-      return request.auth != null;
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function data() { return request.resource.data; }
+
+    function path(collection, id) { return /databases/$(database)/documents/$(collection)/$(id); }
+    function offerPath(orderId, providerId) {
+      return /databases/$(database)/documents/orders/$(orderId)/offers/$(providerId);
     }
 
-    function uid() {
-      return request.auth.uid;
-    }
-
-    function userRole() {
-      return get(/databases/$(database)/documents/users/$(uid())).data.role;
-    }
-
-    function isProvider() {
-      return signedIn() && userRole() == 'provider';
-    }
-
-    function isCustomer() {
-      return signedIn() && userRole() == 'customer';
-    }
+    function role() { return get(path('users', uid())).data.role; }
+    function isProvider() { return signedIn() && role() == 'provider'; }
+    function isCustomer() { return signedIn() && role() == 'customer'; }
 
     /** True when an update touches no fields beyond the allowed list. */
-    function onlyChanges(fields) {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
-    }
+    function onlyChanges(fields) { return data().diff(resource.data).affectedKeys().hasOnly(fields); }
 
-    function unchanged(field) {
-      return request.resource.data[field] == resource.data[field];
-    }
-
-    function isPositiveInt(value) {
-      return value is int && value >= 0 && value <= 100000000;
-    }
+    function cents(value) { return value is int && value >= 0 && value <= 100000000; }
+    function price(value) { return cents(value) && value > 0; }
+    function text(value, max) { return value is string && value.size() <= max; }
 
     // ── users ────────────────────────────────────────────────────────────────
-    // A profile is private. Names shown elsewhere come from the denormalised
-    // `providerName` / `customerName` fields, so nobody needs to read it.
+    // A profile is private. What the other side of a job needs (name, e-mail,
+    // phone) is copied into the offer, booking or job at the moment it is given.
 
     match /users/{userId} {
       allow read: if signedIn() && uid() == userId;
-      allow create: if signedIn() && uid() == userId
-                    && request.resource.data.role in ['provider', 'customer'];
-      // The role is fixed at sign-up; everything else is the user's to edit.
-      allow update: if signedIn() && uid() == userId && unchanged('role');
+      allow create: if signedIn() && uid() == userId && data().role in ['provider', 'customer'];
+      // The role is chosen once, at sign-up.
+      allow update: if signedIn() && uid() == userId && data().role == resource.data.role;
       allow delete: if false;
     }
 
     // ── categories ───────────────────────────────────────────────────────────
-    // The taxonomy is public and maintained by the seed script through the
-    // Admin SDK, which bypasses these rules.
+    // Maintained by the seed script through the Admin SDK, which bypasses rules.
 
     match /categories/{categoryId} {
       allow read: if true;
@@ -72,140 +57,232 @@ service cloud.firestore {
     }
 
     // ── services ─────────────────────────────────────────────────────────────
-    // Public listings. Only the owning provider may write, and may never hand
-    // a service to someone else.
 
     match /services/{serviceId} {
+      function validService() {
+        return text(data().title, 120) && text(data().description, 4000)
+          && cents(data().minPriceInCent) && cents(data().maxPriceInCent)
+          && data().maxPriceInCent >= data().minPriceInCent;
+      }
+
       allow read: if true;
-
-      allow create: if isProvider()
-                    && request.resource.data.providerId == uid()
-                    && isPositiveInt(request.resource.data.minPriceInCent)
-                    && isPositiveInt(request.resource.data.maxPriceInCent)
-                    && request.resource.data.maxPriceInCent >= request.resource.data.minPriceInCent;
-
-      allow update: if isProvider()
-                    && resource.data.providerId == uid()
-                    && unchanged('providerId');
-
-      // Services are archived through a status change, never deleted, so the
-      // bookings and jobs that reference them keep their snapshot.
+      allow create: if isProvider() && data().providerId == uid()
+                    && data().status in ['active', 'paused'] && validService();
+      // Archived is final: bookings and jobs keep pointing at the snapshot.
+      allow update: if signedIn() && resource.data.providerId == uid()
+                    && data().providerId == uid()
+                    && resource.data.status != 'archived'
+                    && data().status in ['active', 'paused', 'archived'] && validService();
       allow delete: if false;
     }
 
     // ── orders ───────────────────────────────────────────────────────────────
 
     match /orders/{orderId} {
-      // Providers browse the job board, so any signed-in user may read orders.
+      function order() { return resource.data; }
+      function owner() { return signedIn() && order().customerId == uid(); }
+
+      function edits() {
+        return data().status == 'open' && price(data().budgetInCent)
+          && text(data().title, 120) && text(data().description, 4000)
+          && onlyChanges(['title', 'description', 'budgetInCent', 'place', 'timeWindow', 'categoryId',
+                          'categoryName', 'subcategoryId', 'subcategoryName', 'updatedAt']);
+      }
+
+      function cancels() {
+        return data().status == 'cancelled' && onlyChanges(['status', 'cancelledAt', 'updatedAt']);
+      }
+
+      // Declining an offer closes it, so the count drops by one.
+      function declines() {
+        return onlyChanges(['offerCount', 'updatedAt'])
+          && data().offerCount == order().offerCount - 1 && data().offerCount >= 0;
+      }
+
+      // The winning offer, the job and the order agree in one transaction.
+      function accepts() {
+        return data().status == 'assigned'
+          && onlyChanges(['status', 'assignedProviderId', 'assignedProviderName', 'jobId', 'assignedAt',
+                          'offerCount', 'updatedAt'])
+          && data().offerCount == 0
+          && getAfter(offerPath(orderId, data().assignedProviderId)).data.status == 'accepted'
+          && getAfter(path('jobs', data().jobId)).data.sourceId == orderId;
+      }
+
+      // A provider's count change must match their own offer appearing or vanishing.
+      function countsOwnOffer() {
+        return isProvider() && order().status == 'open' && onlyChanges(['offerCount', 'updatedAt'])
+          && ((data().offerCount == order().offerCount + 1
+               && !exists(offerPath(orderId, uid())) && existsAfter(offerPath(orderId, uid())))
+           || (data().offerCount == order().offerCount - 1
+               && exists(offerPath(orderId, uid())) && !existsAfter(offerPath(orderId, uid()))));
+      }
+
+      // Once assigned, the order follows its job's status.
+      function followsJob() {
+        return 'jobId' in order()
+          && (order().customerId == uid() || order().assignedProviderId == uid())
+          && onlyChanges(['status', 'startedAt', 'completedAt', 'cancelledAt', 'updatedAt'])
+          && data().status == getAfter(path('jobs', order().jobId)).data.status;
+      }
+
+      // Providers browse the job board. The exact address is not in here.
       allow read: if signedIn();
 
       allow create: if isCustomer()
-                    && request.resource.data.customerId == uid()
-                    && isPositiveInt(request.resource.data.budgetInCent)
-                    && request.resource.data.status == 'open'
-                    && request.resource.data.offerCount == 0;
+                    && data().customerId == uid()
+                    && data().status == 'open'
+                    && data().offerCount == 0
+                    && price(data().budgetInCent)
+                    && text(data().title, 120) && text(data().description, 4000)
+                    && !('jobId' in data()) && !('assignedProviderId' in data());
 
-      allow update: if
-        // The owner edits, cancels, or accepts an offer.
-        (isCustomer() && resource.data.customerId == uid() && unchanged('customerId'))
-        // A provider placing or withdrawing an offer adjusts only the counter.
-        || (isProvider() && onlyChanges(['offerCount', 'updatedAt']))
-        // The assigned provider drives the order's status through their job.
-        || (isProvider()
-            && resource.data.assignedProviderId == uid()
-            && onlyChanges(['status', 'updatedAt', 'completedAt', 'cancelledAt']));
+      allow update: if signedIn() && (
+        (owner() && order().status == 'open' && (edits() || cancels() || declines() || accepts()))
+        || countsOwnOffer()
+        || followsJob()
+      );
 
       allow delete: if false;
+
+      // ── the exact address: the customer's, and the job's once agreed ───────
+
+      match /private/{docId} {
+        allow read: if signedIn() && get(path('orders', orderId)).data.customerId == uid();
+        allow write: if signedIn() && docId == 'address'
+                     && getAfter(path('orders', orderId)).data.customerId == uid()
+                     && getAfter(path('orders', orderId)).data.status == 'open';
+      }
 
       // ── offers ─────────────────────────────────────────────────────────────
       // The document ID is the provider's UID, so one provider can hold at most
       // one offer per order no matter how often the button is pressed.
 
       match /offers/{providerId} {
-        function parentOrder() {
-          return get(/databases/$(database)/documents/orders/$(orderId)).data;
-        }
+        function parent() { return get(path('orders', orderId)).data; }
 
-        allow read: if signedIn()
-                    && (uid() == providerId || parentOrder().customerId == uid());
+        allow read: if signedIn() && (uid() == providerId || parent().customerId == uid());
 
         allow create: if isProvider()
                       && uid() == providerId
-                      && request.resource.data.providerId == uid()
-                      && request.resource.data.status == 'pending'
-                      && isPositiveInt(request.resource.data.priceInCent)
-                      && request.resource.data.priceInCent > 0
-                      && parentOrder().status == 'open'
-                      && parentOrder().customerId != uid();
+                      && data().providerId == uid()
+                      && data().orderId == orderId
+                      && data().status == 'pending'
+                      && price(data().priceInCent)
+                      && text(data().message, 500)
+                      && parent().status == 'open'
+                      && getAfter(path('orders', orderId)).data.offerCount == parent().offerCount + 1;
 
-        // Only the customer decides, and only the price stays untouchable.
-        allow update: if isCustomer()
-                      && parentOrder().customerId == uid()
+        // Only the customer decides, and only the decision changes.
+        allow update: if signedIn()
+                      && parent().customerId == uid()
                       && resource.data.status == 'pending'
-                      && unchanged('priceInCent')
-                      && unchanged('providerId')
-                      && request.resource.data.status in ['accepted', 'declined'];
+                      && data().status in ['accepted', 'declined']
+                      && onlyChanges(['status', 'decidedAt', 'updatedAt']);
 
-        // Withdrawing is the provider deleting their own pending offer.
-        allow delete: if isProvider()
+        // Withdrawing is the provider deleting their own pending offer while bidding is open.
+        allow delete: if signedIn()
                       && uid() == providerId
-                      && resource.data.status == 'pending';
+                      && resource.data.status == 'pending'
+                      && parent().status == 'open';
       }
+    }
+
+    // A provider's own offers across all orders (collection-group query).
+    match /{prefix=**}/offers/{providerId} {
+      allow read: if signedIn() && resource.data.providerId == uid();
     }
 
     // ── bookings ─────────────────────────────────────────────────────────────
 
     match /bookings/{bookingId} {
-      function involved() {
-        return resource.data.customerId == uid() || resource.data.providerId == uid();
+      function booking() { return resource.data; }
+      function involved() { return booking().customerId == uid() || booking().providerId == uid(); }
+
+      // Everything the provider will rely on is copied from the live service.
+      function matchesService() {
+        let source = get(path('services', data().serviceId)).data;
+        return source.status == 'active'
+          && data().providerId == source.providerId
+          && data().serviceTitle == source.title
+          && data().pricing == source.pricing;
       }
 
       allow read: if signedIn() && involved();
 
       allow create: if isCustomer()
-                    && request.resource.data.customerId == uid()
-                    && request.resource.data.providerId != uid()
-                    && request.resource.data.status == 'requested';
+                    && data().customerId == uid()
+                    && data().providerId != uid()
+                    && data().status == 'requested'
+                    && text(data().message, 2000)
+                    && (!('priceInCent' in data()) || price(data().priceInCent))
+                    && !('jobId' in data())
+                    && matchesService();
 
-      allow update: if
-        // The provider accepts or declines.
-        (isProvider()
-         && resource.data.providerId == uid()
-         && resource.data.status == 'requested'
-         && request.resource.data.status in ['accepted', 'declined'])
-        // The customer withdraws an request nobody has answered yet.
-        || (isCustomer()
-            && resource.data.customerId == uid()
-            && resource.data.status == 'requested'
-            && request.resource.data.status == 'cancelled');
+      allow update: if signedIn() && booking().status == 'requested' && (
+        // The provider declines…
+        (booking().providerId == uid() && data().status == 'declined'
+         && onlyChanges(['status', 'declineMessage', 'declinedAt', 'updatedAt']))
+        // …or names the final price and creates the job in the same transaction.
+        || (booking().providerId == uid() && data().status == 'accepted'
+            && onlyChanges(['status', 'priceInCent', 'jobId', 'acceptedAt', 'updatedAt'])
+            && price(data().priceInCent)
+            && getAfter(path('jobs', data().jobId)).data.sourceId == bookingId)
+        // The customer withdraws a request nobody has answered yet.
+        || (booking().customerId == uid() && data().status == 'cancelled'
+            && onlyChanges(['status', 'cancelledAt', 'updatedAt']))
+      );
 
       allow delete: if false;
     }
 
     // ── jobs ─────────────────────────────────────────────────────────────────
-    // Jobs are created inside the accept transactions, never by hand.
+    // Created only inside the two accept transactions, and only when the order
+    // or booking they come from points back at them.
 
     match /jobs/{jobId} {
-      function involved() {
-        return resource.data.customerId == uid() || resource.data.providerId == uid();
+      function job() { return resource.data; }
+
+      function fromOrder() {
+        let order = getAfter(path('orders', data().sourceId)).data;
+        return data().sourceType == 'order'
+          && data().customerId == uid()
+          && order.customerId == uid()
+          && order.jobId == jobId
+          && order.assignedProviderId == data().providerId
+          && data().priceInCent == get(offerPath(data().sourceId, data().providerId)).data.priceInCent;
       }
 
-      allow read: if signedIn() && involved();
+      function fromBooking() {
+        let booking = getAfter(path('bookings', data().sourceId)).data;
+        return data().sourceType == 'booking'
+          && data().providerId == uid()
+          && booking.providerId == uid()
+          && booking.customerId == data().customerId
+          && booking.jobId == jobId
+          && booking.priceInCent == data().priceInCent;
+      }
+
+      // The same table as lib/utils/jobStatus.ts.
+      function step(from, to) {
+        return (from == 'scheduled' && to in ['inProgress', 'cancelled'])
+          || (from == 'inProgress' && to in ['completed', 'cancelled']);
+      }
+
+      allow read: if signedIn() && (job().customerId == uid() || job().providerId == uid());
 
       allow create: if signedIn()
-                    && request.resource.data.providerId != request.resource.data.customerId
-                    && request.resource.data.status == 'scheduled'
-                    && isPositiveInt(request.resource.data.priceInCent)
-                    && (request.resource.data.customerId == uid()
-                        || request.resource.data.providerId == uid());
+                    && data().status == 'scheduled'
+                    && data().customerId != data().providerId
+                    && price(data().priceInCent)
+                    && (fromOrder() || fromBooking());
 
-      // The provider moves the job forward; the agreed terms are frozen.
-      allow update: if isProvider()
-                    && resource.data.providerId == uid()
-                    && unchanged('priceInCent')
-                    && unchanged('customerId')
-                    && unchanged('providerId')
-                    && onlyChanges(['status', 'updatedAt', 'startedAt', 'completedAt', 'cancelledAt']);
+      // The provider drives the job; the customer may only call it off before it starts.
+      allow update: if signedIn()
+                    && onlyChanges(['status', 'startedAt', 'completedAt', 'cancelledAt', 'updatedAt'])
+                    && step(job().status, data().status)
+                    && (job().providerId == uid()
+                        || (job().customerId == uid() && job().status == 'scheduled' && data().status == 'cancelled'));
 
       allow delete: if false;
     }

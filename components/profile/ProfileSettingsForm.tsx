@@ -28,7 +28,7 @@ export default function ProfileSettingsForm({
   const [profile, setProfile] = useState<Profile>(initialProfile)
   const [saved, setSaved] = useState(false)
 
-  const handleChange = (field: keyof Profile, value: string | boolean) => {
+  const handleChange = (field: keyof Profile, value: string) => {
     setSaved(false)
     setProfile((prev) => ({ ...prev, [field]: value }))
   }
@@ -45,9 +45,9 @@ export default function ProfileSettingsForm({
 
   return (
     <section className="card bg-background p-6 md:p-7">
-      <h2 className="text-[17px] font-semibold text-text">Einstellungen</h2>
-      <p className="mt-1 text-[13.5px] text-text/50">
-        Diese Angaben sehen deine Kontakte auf LiNQ.
+      <h2 className="text-[17px] font-semibold text-text">Kontaktdaten</h2>
+      <p className="mt-1 text-[13.5px] leading-relaxed text-text/50">
+        Dein Profil ist privat. Telefon und E-Mail bekommt nur, mit wem du einen Job vereinbarst.
       </p>
 
       <form onSubmit={handleSave} className="mt-7 flex flex-col gap-5">
@@ -69,16 +69,6 @@ export default function ProfileSettingsForm({
           ))}
         </div>
 
-        <label className="flex cursor-pointer items-center gap-3 rounded-md border border-secondary px-4 py-3.5 text-[14px] text-text/75 transition-colors hover:border-text/20">
-          <input
-            type="checkbox"
-            checked={profile.notificationsEnabled}
-            onChange={(e) => handleChange("notificationsEnabled", e.target.checked)}
-            disabled={loading || saving}
-            className="h-4 w-4 accent-primary"
-          />
-          Benachrichtigungen aktivieren
-        </label>
 
         <div className="flex items-center gap-4 border-t border-secondary pt-5">
           <button type="submit" disabled={loading || saving} className="btn btn-primary">

@@ -11,14 +11,12 @@ const PUBLIC_PATHS = new Set(["/login", "/signup"])
 const ROLE_RESTRICTED_PATHS: Array<{ prefix: string; role: UserRole }> = [
   { prefix: "/dashboard", role: "provider" },
   { prefix: "/find-jobs", role: "provider" },
-  { prefix: "/invoices", role: "provider" },
   { prefix: "/my-services", role: "provider" },
   { prefix: "/profile", role: "provider" },
   { prefix: "/customer-dashboard", role: "customer" },
   { prefix: "/customer-profile", role: "customer" },
   { prefix: "/my-orders", role: "customer" },
   { prefix: "/find-services", role: "customer" },
-  { prefix: "/service-finden", role: "customer" },
 ]
 
 function pathMatchesPrefix(pathname: string, prefix: string) {

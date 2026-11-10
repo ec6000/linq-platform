@@ -6,10 +6,9 @@ import { Menu, X } from "lucide-react";
 import Logo from "@/components/brand/Logo";
 
 const navLinks = [
-  { label: "So funktioniert's", href: "#so-funktionierts" },
-  { label: "Für Kunden", href: "#fuer-kunden" },
-  { label: "Für Dienstleister", href: "#fuer-dienstleister" },
-  { label: "Kategorien", href: "#kategorien" },
+  { label: "So funktioniert's", href: "/#so-funktionierts" },
+  { label: "Für Helfer", href: "/#fuer-dienstleister" },
+  { label: "Vertrauen", href: "/#vertrauen" },
 ];
 
 export default function MarketingHeader() {

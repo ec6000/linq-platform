@@ -4,13 +4,10 @@ import { useEffect, useRef } from "react"
 import Link from "next/link"
 import { ChevronRight, X } from "lucide-react"
 import type { Order } from "@/lib/types/order"
-import { formatEuro, formatTimeRange } from "@/lib/utils/format"
+import { formatDistance, formatEuro, formatTimeRange } from "@/lib/utils/format"
 
-/** An order enriched with everything the search computed about it. */
-export type RankedOrder = Order & {
-  distanceKm: number | null
-  matchScore: number
-}
+/** An order with its distance from the searched place, if there is one. */
+export type RankedOrder = Order & { distanceKm: number | null }
 
 // Google Maps needs resolved colors rather than CSS var() expressions.
 function getMapColors() {
@@ -150,11 +147,11 @@ export function MapView({ orders, selectedOrder, onOrderSelect }: MapViewProps) 
 export function DetailPanel({ order, onClose }: { order: RankedOrder; onClose: () => void }) {
   const facts = [
     { label: "Zeitfenster", value: formatTimeRange(order.timeWindow.start, order.timeWindow.end) },
-    { label: "Adresse", value: order.place.address },
+    { label: "Gegend", value: order.place.city },
     { label: "Unterkategorie", value: order.subcategoryName },
     {
       label: "Entfernung",
-      value: order.distanceKm === null ? null : `${order.distanceKm.toFixed(1)} km`,
+      value: order.distanceKm === null ? null : formatDistance(order.distanceKm),
     },
   ].filter((fact): fact is { label: string; value: string } => Boolean(fact.value))
 
@@ -199,7 +196,7 @@ export function DetailPanel({ order, onClose }: { order: RankedOrder; onClose: (
         <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-text/40">
           Beschreibung
         </h3>
-        <p className="text-[14px] leading-relaxed text-text/75">{order.description}</p>
+        <p className="whitespace-pre-line text-[14px] leading-relaxed text-text/75">{order.description}</p>
       </div>
 
       <div className="border-t border-secondary p-4">

@@ -10,7 +10,12 @@ afterEach(() => {
   if (originalKey === undefined) delete process.env.GEOAPIFY_API_KEY
   else process.env.GEOAPIFY_API_KEY = originalKey
 })
-const request = (text: string, limit = "5") => new NextRequest(`http://localhost/api/geoapify/autocomplete?text=${encodeURIComponent(text)}&limit=${limit}`)
+let client = 0
+const request = (text: string, headers: Record<string, string> = {}) =>
+  new NextRequest(`http://localhost/api/geoapify/autocomplete?text=${encodeURIComponent(text)}`, {
+    // A fresh client per request, so the rate limit only bites where a test wants it to.
+    headers: { "x-forwarded-for": `10.0.0.${++client}`, ...headers },
+  })
 
 test("missing API configuration produces a controlled response", async () => {
   delete process.env.GEOAPIFY_API_KEY
@@ -24,20 +29,31 @@ test("short and excessive queries never call the upstream service", async () => 
   assert.equal(fetch.mock.callCount(), 0)
 })
 
-test("limit is an integer, malformed coordinates and out-of-area results are removed", async () => {
+test("malformed coordinates and out-of-area results are removed; the district comes along", async () => {
   mock.method(globalThis, "fetch", async (url: string | URL | Request, options?: RequestInit) => {
-    assert.equal(new URL(String(url)).searchParams.get("limit"), "3")
+    assert.equal(new URL(String(url)).searchParams.get("limit"), "5")
     assert.ok(options?.signal)
     return Response.json({ features: [
-      { properties: { formatted: "Köln", lat: 50.9, lon: 6.9, city: "Köln" } },
+      { properties: { formatted: "Köln", lat: 50.9, lon: 6.9, city: "Köln", suburb: "Sülz" } },
       { properties: { formatted: "Berlin", lat: 52.5, lon: 13.4, city: "Berlin" } },
       { properties: { formatted: "Ungültig", lat: 150, lon: 6.9, city: "Köln" } },
       { properties: { formatted: "Fehlt", city: "Köln" } },
     ] })
   })
-  const response = await GET(request("Köln", "3.9"))
+  const response = await GET(request("Köln"))
   assert.equal(response.status, 200)
-  assert.deepEqual(await response.json(), { results: [{ label: "Köln", lat: 50.9, lon: 6.9 }] })
+  assert.match(response.headers.get("cache-control") ?? "", /s-maxage/)
+  assert.deepEqual(await response.json(), { results: [{ label: "Köln", lat: 50.9, lon: 6.9, area: "Köln Sülz" }] })
+})
+
+test("other websites and floods are turned away before the paid API is called", async () => {
+  const fetch = mock.method(globalThis, "fetch", async () => Response.json({ features: [] }))
+  assert.equal((await GET(request("Köln", { "sec-fetch-site": "cross-site" }))).status, 403)
+  const flood = { "x-forwarded-for": "10.9.9.9" }
+  const statuses = []
+  for (let index = 0; index < 45; index++) statuses.push((await GET(request("Köln", flood))).status)
+  assert.equal(statuses.filter((status) => status === 429).length, 5)
+  assert.equal(fetch.mock.callCount(), 40)
 })
 
 test("network failures and timeouts return 502 without leaking upstream URLs or keys", async () => {

@@ -199,7 +199,6 @@ async function main() {
     email: email ?? existing?.email ?? persona.email,
     phone: existing?.phone ?? persona.phone,
     company: existing?.company ?? persona.company,
-    notificationsEnabled: existing?.notificationsEnabled ?? true,
     updatedAt: new Date(),
   })
 

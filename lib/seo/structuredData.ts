@@ -6,7 +6,7 @@ export const organizationSchema = {
   name: "LiNQ",
   url: SITE_URL,
   description:
-    "LiNQ ist eine Plattform für lokale Dienstleistungen in Köln. Kunden finden passende Dienstleister, Dienstleister finden lokale Aufträge.",
+    "LiNQ verbindet Menschen in Köln, die Hilfe beim Umzug brauchen, mit Helfern aus ihrer Nähe.",
   address: {
     "@type": "PostalAddress",
     addressLocality: "Köln",
@@ -31,7 +31,7 @@ export const localBusinessSchema = {
   name: "LiNQ",
   url: SITE_URL,
   description:
-    "Plattform für lokale Dienstleistungen in Köln: Reinigung, Umzugshilfe, Gartenarbeit, Möbelaufbau, Haushaltshilfe und mehr.",
+    "Umzugshilfe in Köln: Helfer aus der Nähe schicken ihren Preis, Kunden suchen sich einen aus.",
   areaServed: {
     "@type": "City",
     name: "Köln",

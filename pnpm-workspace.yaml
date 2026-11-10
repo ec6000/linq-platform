@@ -1,3 +1,7 @@
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+
+# Firestore's Node build pins a gRPC release with a known advisory (GHSA-m9gg-hp2v-232j).
+overrides:
+  "@firebase/firestore>@grpc/grpc-js": ^1.13.6

@@ -31,7 +31,7 @@ test("both flows produce jobs, so neither path is left untested", () => {
 test("document IDs are unique within every collection", () => {
   const dataset = buildDataset()
   for (const [name, documents] of Object.entries(dataset)) {
-    if (name === "offers") continue
+    if (name === "offers" || name === "orderAddresses") continue
     const ids = (documents as Array<{ id: string }>).map((entry) => entry.id)
     assert.equal(new Set(ids).size, ids.length, `${name} enthält doppelte IDs`)
   }

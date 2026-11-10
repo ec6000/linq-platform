@@ -65,6 +65,9 @@ async function writeDataset(db: Firestore, dataset: Dataset) {
   for (const user of dataset.users) await writer.set(["users", user.id], user.data)
   for (const service of dataset.services) await writer.set(["services", service.id], service.data)
   for (const order of dataset.orders) await writer.set(["orders", order.id], order.data)
+  for (const entry of dataset.orderAddresses) {
+    await writer.set(["orders", entry.orderId, "private", "address"], entry.data)
+  }
   for (const offer of dataset.offers) {
     await writer.set(["orders", offer.orderId, "offers", offer.providerId], offer.data)
   }

@@ -11,6 +11,10 @@ interface ConfirmationModalProps {
   /** Renders the confirm action in red, for anything that destroys or cancels. */
   destructive?: boolean
   loading?: boolean
+  /** Keeps the confirm button disabled, e.g. while a required field is empty. */
+  confirmDisabled?: boolean
+  /** Optional fields between text and buttons — a price, a short note. */
+  children?: React.ReactNode
   onConfirm: () => void
   onCancel: () => void
 }
@@ -23,6 +27,8 @@ export default function ConfirmationModal({
   cancelLabel = "Abbrechen",
   destructive = false,
   loading,
+  confirmDisabled,
+  children,
   onConfirm,
   onCancel,
 }: ConfirmationModalProps) {
@@ -56,6 +62,8 @@ export default function ConfirmationModal({
         </h3>
         <p className="mt-2 text-[14px] leading-relaxed text-text/60">{description}</p>
 
+        {children && <div className="mt-5">{children}</div>}
+
         <div className="mt-7 flex justify-end gap-2">
           <button type="button" disabled={loading} onClick={onCancel} className="btn btn-ghost">
             {cancelLabel}
@@ -63,7 +71,7 @@ export default function ConfirmationModal({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={loading}
+            disabled={loading || confirmDisabled}
             className={`btn ${destructive ? "btn-danger-solid" : "btn-primary"}`}
           >
             {loading ? "Einen Moment…" : confirmLabel}

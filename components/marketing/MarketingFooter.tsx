@@ -6,16 +6,16 @@ const columns = [
     title: "Plattform",
     links: [
       { label: "So funktioniert's", href: "/#so-funktionierts" },
-      { label: "Für Kunden", href: "/#fuer-kunden" },
-      { label: "Für Dienstleister", href: "/#fuer-dienstleister" },
-      { label: "Kategorien", href: "/#kategorien" },
+      { label: "Für Helfer", href: "/#fuer-dienstleister" },
+      { label: "Anmelden", href: "/login" },
+      { label: "Registrieren", href: "/signup" },
     ],
   },
   {
-    title: "Konto",
+    title: "Rechtliches",
     links: [
-      { label: "Anmelden", href: "/login" },
-      { label: "Registrieren", href: "/signup" },
+      { label: "Impressum", href: "/impressum" },
+      { label: "Datenschutz", href: "/datenschutz" },
     ],
   },
 ];
@@ -30,8 +30,7 @@ export default function MarketingFooter() {
               <Logo size="sm" />
             </Link>
             <p className="max-w-xs text-[14px] leading-relaxed text-text/55">
-              Die Plattform für lokale Dienstleistungen – entwickelt für Köln, gebaut für den
-              Alltag.
+              Umzugshilfe in Köln, direkt vom Helfer aus deinem Veedel.
             </p>
           </div>
 
